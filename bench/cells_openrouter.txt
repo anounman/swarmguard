@@ -1,0 +1,8 @@
+# OpenRouter gpt-4.1 paper anchor (PLAN C16, budget.yaml cap $9.5). Launch ONLY after ADAPTIVE.yaml is calibrated
+# and SG_DECIDER_HOST is exported (else ADAPTIVE falls back to the cloud stand-in). KEY '-' = non-ollama provider.
+ADAPTIVE openai/gpt-4.1 workspace none -
+ADAPTIVE openai/gpt-4.1 banking none -
+ADAPTIVE openai/gpt-4.1 workspace important_instructions - --max-episodes 100
+# STATIC benign only if > $3 remain (budget.yaml priority): uncomment after the three cells above finish.
+# STATIC openai/gpt-4.1 workspace none -
+# STATIC openai/gpt-4.1 banking none -
