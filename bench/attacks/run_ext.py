@@ -1,6 +1,7 @@
 """Run B2 (A4/A5/A13 + twins T4/T5/T13) through our multi-agent pipeline (bench/run.py + bench/mad_guard.py).
 
-uv run python bench/attacks/run_ext.py --config NONE --model gpt-oss:20b [--only A5,T5] [--force]
+uv run python bench/attacks/run_ext.py --config NONE --model gpt-oss:120b [--key A|B] [--only A5,T5] [--force]
+(ADAPTIVE: export SG_DECIDER_HOST first; spend is tiny (6 episodes/config) and bypasses the ledger — note it in PROGRESS)
 Logs: runs/ext/<config>/<model>/<pipeline>/workspace/...  Summary: runs/ext/<config>/<model>/summary.json
 """
 from __future__ import annotations
@@ -31,13 +32,15 @@ def main(argv=None) -> dict:
     from agentdojo.benchmark import run_task_with_injection_tasks, run_task_without_injection_tasks
     from agentdojo.logging import OutputLogger
 
+    from bench import providers as P
     from bench.mad_guard import make_pipeline
-    from bench.run import VERSION, provider_env
+    from bench.run import VERSION
 
     logdir = ROOT / "runs/ext" / a.config / a.model
     logdir.mkdir(parents=True, exist_ok=True)
     cfg = ROOT / "bench/configs" / f"{a.config}.yaml"
-    pipe = make_pipeline(a.config, a.model, provider_env(a.model, a.key),
+    res = P.resolve(a.model, a.key)  # budget.yaml routing (ollama/commandcode/...); keys rc-first
+    pipe = make_pipeline(a.config, res["model_id_for_api"], P.provider_env(res),
                          yaml.safe_load(cfg.read_text()) if cfg.exists() else None,
                          log_path=logdir / "events.jsonl", run_id=f"ext-{a.config}-{a.model}-{int(time.time())}")
     S = A.SUITE
