@@ -1,0 +1,9 @@
+# ADAPTIVE_AUDIT — ADAPTIVE + cloud auditor on the grey band of the ADAPTIVE cascade.
+monitor:   # same stand-in as ADAPTIVE.yaml
+  model: gpt-oss:20b
+  base_url: https://ollama.com/v1
+  key_env: OLLAMA_API_KEY
+auditor:
+  model: kimi-k3.1-pro
+  base_url: https://ollama.com/v1
+  key_env: OLLAMA_API_KEY1   # key B per PLAN C7

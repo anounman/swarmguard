@@ -1,0 +1,1 @@
+# ADAPTIVE_RULES — STATIC + sg.monitors.RulesMonitor (no LLM). Risk->action thresholds live in sg.schema.action_for.

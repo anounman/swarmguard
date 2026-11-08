@@ -1,0 +1,4 @@
+{"task_id": "door-demo", "name": "shell-agent", "tools": ["run", "send_email"],
+ "allow_cmds": ["ls", "echo", "cat"], "deny_patterns": ["rm\\s+-rf", "curl|wget"],
+ "egress_sinks": ["send_email"], "egress_allow": {"send_email": {"recipients": ["*@bluesparrowtech.com"]}},
+ "ttl_s": 600}

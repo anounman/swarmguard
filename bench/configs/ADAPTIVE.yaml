@@ -1,0 +1,7 @@
+# ADAPTIVE — STATIC + Cascade(RulesMonitor, LLMMonitor) (LLM only on grey band / sinks).
+# ponytail: cloud gpt-oss:20b stands in for the decider (PLAN fallback) until swarmguard-decider is served;
+# then set model: swarmguard-decider and base_url to the decider's Ollama host (http://<box>:11434/v1).
+monitor:
+  model: gpt-oss:20b
+  base_url: https://ollama.com/v1
+  key_env: OLLAMA_API_KEY

@@ -1,0 +1,31 @@
+# SwarmGuard money law (PLAN.md C13). Orchestrator-owned. loop/ reads this before any full run.
+providers:
+  ollama:
+    base_url: https://ollama.com/v1
+    cap_usd_total: 58          # ~$58 across both keys (user, 06:20 CET Nov 8)
+    reserve_usd: 8             # never spend below this remaining
+    max_concurrent_per_key: 3  # pay-as-you-go limit → 2 suites per key
+    keys:
+      A: OLLAMA_API_KEY        # env
+      B: OLLAMA_API_KEY1       # ~/.zshrc only; export before use
+  openai:
+    allowed: false             # ~$2-3 credit left; never call
+  openrouter:
+    allowed: false             # credit exhausted ($25.00/$25.00) at 06:25 CET
+# prices USD per 1M tokens from ollama.com/pricing (input; output assumed ~4x input until measured)
+prices:
+  gpt-oss:20b:      {input: 0.07, output_est: 0.30}
+  gpt-oss:120b:     {input: 0.15, output_est: 0.60}
+  deepseek-v4-pro:  {input: 0.66, output_est: 2.60, note: off-peak price, all weekend}
+  kimi-k3.1-pro:    {input: 3.00, output_est: 12.0, note: likely too expensive}
+# spend priority = run order; each row only after the previous is complete and the gate passes
+priority:
+  - {model: gpt-oss:120b,   configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE], suites: all, role: headline}
+  - {model: gpt-oss:20b,    configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE], suites: all, role: dumb tier}
+  - {model: deepseek-v4-pro, configs: [NONE, ADAPTIVE], suites: [workspace, banking], role: smart tier, only_if_remaining_usd_gt: 25}
+monitors:
+  smoke_model: gpt-oss:20b
+  llm_monitor_model: gpt-oss:20b      # until swarmguard-decider is served
+  teacher_model: gpt-oss:120b         # ~500 teacher rows max
+partial_baselines:
+  - {path: runs/mad/NONE/gpt-4.1, model: gpt-4.1, status: partial, episodes: 329, note: recorded before C13; never extended}

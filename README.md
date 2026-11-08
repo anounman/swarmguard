@@ -22,3 +22,6 @@ uv sync --dev
 cp .env.example .env   # fill keys
 uv run pytest -q
 ```
+
+## Providers and budget
+All LLM calls go to **Ollama Cloud** (`https://ollama.com/v1`, OpenAI-compatible). `budget.yaml` holds the cap, keys, concurrency limit and model priority; the loop's bench stage refuses to launch a run whose projected cost exceeds the remaining budget. OpenAI and OpenRouter are not used in this project (see `PLAN.md` C13). `runs/mad/NONE/gpt-4.1/` is a partial undefended gpt-4.1 baseline recorded before that decision and is reported as partial.
