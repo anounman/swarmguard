@@ -23,8 +23,30 @@ def row_provider(r: dict, budget: dict) -> str:
     return "openai" if r.get("model") == "gpt-4.1" else provider_of(r.get("model", ""), budget)
 
 
+RESERVE_TTL = 6 * 3600  # ponytail: a SIGKILLed run never releases its reservation; expire it instead
+
+
+def row_usd(r: dict, budget: dict) -> float:
+    """est_usd; pre-C13 rows (no provider) were priced with run.py's old table -> reprice at budget.yaml prices."""
+    if r.get("provider") or r.get("reserved"):
+        return r.get("est_usd") or 0
+    try:
+        pi, po = price(r.get("model", ""), budget)
+        return ((r.get("prompt_tokens") or 0) * pi + (r.get("completion_tokens") or 0) * po) / 1e6
+    except KeyError:
+        return r.get("est_usd") or 0
+
+
+def live(rows, now: float | None = None) -> list[dict]:
+    """Drop reservations that a final row (same run_id) has replaced, or that expired."""
+    now = now or time.time()
+    done = {r.get("run_id") for r in rows if not r.get("reserved") and r.get("run_id")}
+    return [r for r in rows if not r.get("reserved")
+            or (r.get("run_id") not in done and now - r.get("ts", 0) < RESERVE_TTL)]
+
+
 def spent(rows, provider, budget, key=None, since: float | None = None) -> float:
-    return sum(r.get("est_usd") or 0 for r in rows if row_provider(r, budget) == provider
+    return sum(row_usd(r, budget) for r in live(rows) if row_provider(r, budget) == provider
                and (key is None or r.get("key") == key) and (since is None or r.get("ts", 0) >= since))
 
 
@@ -36,12 +58,16 @@ def price(model: str, budget: dict) -> tuple[float, float]:
 def tokens_per_episode(rows, model) -> tuple[float, float, bool]:
     """(prompt, completion, measured). Uses rows with n_episodes, or legacy benign rows (episodes = n_tasks)."""
     m = canonical(model)
+
+    def eps(r):  # n_episodes=0 (resumed, nothing to do) must stay 0, not fall back to n_tasks
+        return r["n_episodes"] if r.get("n_episodes") is not None else (
+            r.get("n_tasks") or 0 if r.get("attack") == "none" else 0)
     ok = [r for r in rows if canonical(r.get("model", "")) == m and not r.get("tokens_estimated")
-          and (r.get("n_episodes") or (r.get("attack") == "none" and r.get("n_tasks")))]
+          and not r.get("reserved") and not r.get("crashed") and eps(r) > 0 and (r.get("prompt_tokens") or 0) > 0]
     if len(ok) < 3:
         return (*DEFAULT_TOK, False)
-    eps = sum(r.get("n_episodes") or r["n_tasks"] for r in ok)
-    return sum(r["prompt_tokens"] for r in ok) / eps, sum(r["completion_tokens"] for r in ok) / eps, True
+    n = sum(eps(r) for r in ok)
+    return sum(r["prompt_tokens"] for r in ok) / n, sum(r["completion_tokens"] for r in ok) / n, True
 
 
 def plan_pairs(user_tasks, injection_tasks, attack, n=None, inj=None, max_episodes=None) -> list[tuple]:
@@ -76,7 +102,7 @@ def gate(model: str, episodes: int, budget: dict, rows: list[dict], key=None, no
     d = {"provider": prov, "key": key, "model": canonical(model), "episodes": episodes, "spent_usd": round(total, 4),
          "remaining_usd": round(remaining, 4), "projected_usd": round(proj, 4), "tokens_measured": measured,
          "tokens_per_episode": round(tp + tc)}
-    if prov == "ollama" and key:
+    if prov == "ollama" and key and any(r.get("key") for r in rows):  # pre-C13 rows carry no key
         d["spent_key_usd"] = round(spent(rows, prov, budget, key=key), 4)
     reason = None
     if pc.get("allowed") is False or prov in ("openai", "groq"):

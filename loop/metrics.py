@@ -28,6 +28,7 @@ import yaml
 from scipy.stats import binomtest
 from agentdojo.benchmark import load_task_results
 
+from bench import budget as B
 from sg.schema import Event, EventKind
 
 TARGETS = Path(__file__).with_name("targets.yaml")
@@ -159,24 +160,24 @@ def cell(model_dir: Path) -> dict:
 
 
 def spend_rows(bench_dir: Path, budget: dict | None = None) -> list[dict]:
-    """spend.jsonl rows normalised to {ts, provider, key, config, mdir, usd}; tolerates old rows without
-    provider/key/logdir and broken lines."""
+    """spend.jsonl rows normalised to {ts, provider, key, config, mdir, usd}. Glue to bench/budget.py (the gate's own
+    accounting): superseded/expired reservations dropped (B.live), pre-C13 rows repriced from tokens (B.row_usd),
+    provider inferred for old rows (B.row_provider). Broken lines are skipped."""
     budget = budget if budget is not None else yaml.safe_load(BUDGET.read_text())
     f = bench_dir / "spend.jsonl"
-    out = []
+    rows = []
     for line in f.read_text().splitlines() if f.exists() else []:
         try:
             d = json.loads(line)
         except Exception:
             continue
-        if not isinstance(d, dict):
-            continue
-        model = str(d.get("model"))
-        # ponytail: rows without provider predate C16; a bare gpt-4.1 then meant OpenAI direct (not OpenRouter)
-        prov = d.get("provider") or ("openai" if model == "gpt-4.1" else provider_of(model, budget))
-        usd = next((d[k] for k in ("est_usd", "usd", "cost_usd") if isinstance(d.get(k), (int, float))), 0.0)
+        if isinstance(d, dict):
+            rows.append(d)
+    out = []
+    for d in B.live(rows):
+        prov, model = B.row_provider(d, budget), str(d.get("model"))
         out.append({"ts": d.get("ts") or 0, "provider": prov, "key": d.get("key") or ("?" if prov == "ollama" else None),
-                    "config": str(d.get("config")), "usd": usd,
+                    "config": str(d.get("config")), "usd": B.row_usd(d, budget),
                     "mdir": Path(d["logdir"]).name if d.get("logdir") else model_dirname(model)})
     return out
 
@@ -220,12 +221,16 @@ def compute(runs_root: Path, bench: str = "mad", out: Path = Path("results")) ->
             base = cells.get("NONE", {}).get(m, {})
             rules = cells.get("ADAPTIVE_RULES", {}).get(m, {})
             sub = lambda a, b: round(a - b, 1) if a is not None and b is not None else None  # noqa: E731
-            c["utility_delta_vs_none"] = sub(c["utility_no_attack"], base.get("utility_no_attack"))
+            # utility comparisons only on the same suite set: pooled utilities over different suites (runs in
+            # progress) are not comparable. ponytail: suites = union over attacks, not per-attack.
+            same_b, same_r = c["suites"] == base.get("suites"), c["suites"] == rules.get("suites")
+            c["utility_delta_vs_none"] = sub(c["utility_no_attack"], base.get("utility_no_attack")) if same_b else None
             c["asr_drop_vs_none"] = sub(base.get("asr"), c["asr"])
             bu = base.get("utility_no_attack")
-            c["utility_retention"] = round(100 * c["utility_no_attack"] / bu, 1) if c["utility_no_attack"] is not None and bu else None
+            c["utility_retention"] = (round(100 * c["utility_no_attack"] / bu, 1)
+                                      if same_b and c["utility_no_attack"] is not None and bu else None)
             c["utility_gain_vs_rules"] = (sub(c["utility_no_attack"], rules.get("utility_no_attack"))
-                                          if ci_overlap(c["asr_ci"], rules.get("asr_ci")) else None)
+                                          if same_r and ci_overlap(c["asr_ci"], rules.get("asr_ci")) else None)
     dec_f = out / "decider_eval.json"
     return {
         "generated": time.strftime("%Y-%m-%d %H:%M:%S %Z"),

@@ -6,10 +6,11 @@ LOOPDIR ?= loop
 TRAIN ?= train
 L = uv run python -m loop.loop --iter $(ITER) --runs $(RUNS) --results $(RESULTS) --loopdir $(LOOPDIR) --train-dir $(TRAIN)
 
-.PHONY: loop smoke bench metrics compare harvest retrain report test
+.PHONY: loop smoke bench metrics compare harvest retrain report test dry-run
 loop: ; $(L) --stage all
 smoke: ; $(L) --stage smoke
 bench: ; $(L) --stage bench
+dry-run: ; $(L) --stage all --dry-run   # plan + budget-gate decision per cell; launches nothing
 metrics: ; $(L) --stage metrics
 compare: ; $(L) --stage compare
 harvest: ; $(L) --stage harvest

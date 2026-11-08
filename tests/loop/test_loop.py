@@ -43,7 +43,8 @@ def fake_tree(tmp: Path) -> Path:
     # legacy untagged events file: attack unknown -> must not count as benign
     leg = [Event(run_id="r2", agent_id="a", step=0, kind=EventKind.DENY, tool="send_money", reason="egress")]
     (runs / "mad" / "ADAPTIVE" / "gpt-4.1" / "events-banking.jsonl").write_text(leg[0].model_dump_json() + "\n")
-    (runs / "mad" / "spend.jsonl").write_text(json.dumps({"config": "ADAPTIVE", "model": "gpt-4.1", "est_usd": 0.25}) + "\n")
+    (runs / "mad" / "spend.jsonl").write_text(json.dumps({"provider": "openrouter", "config": "ADAPTIVE", "model": "openai/gpt-4.1", "est_usd": 0.25,
+                                                       "logdir": str(runs / "mad/ADAPTIVE/gpt-4.1")}) + "\n")
     return runs
 
 
@@ -69,7 +70,8 @@ def test_metrics_compare_harvest_render(tmp_path):
     assert (loopdir / "iter_0" / "metrics.json").exists()
 
     diff = (loopdir / "iter_0" / "diff.md").read_text()
-    assert "| asr_adaptive |" in diff and "FAIL" in diff and "MISSING" in diff and "iter 0" in diff
+    assert "| asr_adaptive |" in diff and "| anchor_util |" in diff and "PASS" in diff and "MISSING" in diff
+    assert "iter 0" in diff
 
     rows = [TrainRow.model_validate_json(x) for x in (train / "rows_iter_0.jsonl").read_text().splitlines()]
     assert sum(r.output.risk >= 8 for r in rows) == 1  # FN from the successful attack under ADAPTIVE
@@ -107,11 +109,124 @@ def test_bench_continues_and_tags_events(tmp_path, monkeypatch):
             return self.rc
 
     monkeypatch.setattr(L.subprocess, "Popen", P)
-    bad = L.suites_parallel("NONE", "gpt-oss:20b", 1, tmp_path)
+    monkeypatch.setattr(L, "gate", lambda cmd: True)
+    bad = L.suites_parallel("NONE", {"model": "gpt-oss:20b"}, tmp_path, n=1, inj="injection_task_0")
     assert bad == ["NONE/gpt-oss:20b/slack/important_instructions"] and len(calls) == 8
+    assert all(c[c.index("--inj") + 1] == "injection_task_0" and c[c.index("--n") + 1] == "1" for c in calls)
     assert (tmp_path / "events-slack.none.jsonl").read_text() == "none\n"
     assert not (tmp_path / "events-slack.jsonl").exists()
-    assert len([c for c in L.suites_parallel("NONE", "gpt-4.1", None, tmp_path)]) == 0 and len(calls) == 12
+    # gate refuses -> cell skipped, not launched, not a failure
+    monkeypatch.setattr(L, "gate", lambda cmd: False)
+    assert L.suites_parallel("STATIC", {"model": "gpt-oss:20b"}, tmp_path) == [] and len(calls) == 8
+
+
+def test_gate_exit_codes(monkeypatch):
+    from loop import loop as L
+
+    class R:
+        def __init__(self, rc):
+            self.returncode, self.stdout, self.stderr = rc, "GATE x\n", "warn\n"
+
+    monkeypatch.setattr(L.subprocess, "run", lambda cmd, **k: R(0) if "gpt-oss:20b" in cmd else R(2))
+    assert L.gate(["py", "bench/run.py", "--model", "gpt-oss:20b"])
+    assert L.gate(["py", "bench/run.py", "--model", "openai/gpt-4.1"]) is None  # rc 2 without 'GATE REFUSE' = error
+
+
+def _plan(monkeypatch, tmp_path, stage, remaining=9.5):
+    from loop import loop as L
+    gated = []
+    monkeypatch.setattr(L, "gate", lambda cmd: gated.append(cmd) or True)
+    monkeypatch.setattr(L.subprocess, "Popen", lambda *a, **k: (_ for _ in ()).throw(AssertionError("launched")))
+    monkeypatch.setattr(L, "remaining_usd", lambda prov, runs: remaining)
+    a = type("A", (), {"runs": str(tmp_path / "runs"), "dry_run": True})()
+    getattr(L, stage)(a)
+    arg = lambda c, f: c[c.index(f) + 1] if f in c else None  # noqa: E731
+    return [{f: arg(c, f) for f in ("--config", "--model", "--suite", "--attack", "--key", "--logdir", "--max-episodes",
+                                    "--n", "--inj")} for c in gated]
+
+
+def test_lanes_dry_run_plan(tmp_path, monkeypatch):
+    cells = _plan(monkeypatch, tmp_path, "stage_bench")
+    ollama = [c for c in cells if c["--model"].startswith("gpt-oss")]
+    assert len(ollama) == 2 * 4 * 4 * 2  # models x configs x suites x attacks
+    assert {(c["--suite"], c["--key"]) for c in ollama} == {("workspace", "A"), ("banking", "A"), ("slack", "B"),
+                                                            ("travel", "B")}
+    cc = [c for c in cells if c["--model"] == "deepseek/deepseek-v4.1-flash"]
+    assert len(cc) == 4 * 4 * 2 and all(c["--key"] is None for c in cc)
+    assert all(c["--logdir"].endswith("/deepseek-v4.1-flash") for c in cc)
+    orr = [c for c in cells if c["--model"] == "openai/gpt-4.1"]
+    assert all(c["--logdir"].endswith("/gpt-4.1") and c["--config"] != "NONE" and c["--key"] is None for c in orr)
+    assert [c["--suite"] for c in orr if c["--max-episodes"] == "100"] == ["workspace"]
+    assert sorted((c["--config"], c["--suite"], c["--attack"]) for c in orr) == [
+        ("ADAPTIVE", "banking", "none"), ("ADAPTIVE", "workspace", "important_instructions"),
+        ("ADAPTIVE", "workspace", "none"), ("STATIC", "banking", "none"), ("STATIC", "workspace", "none")]
+    assert not any("kimi" in c["--model"] for c in cells)
+    # openrouter STATIC only if > $3 left
+    orr = [c for c in _plan(monkeypatch, tmp_path, "stage_bench", remaining=2.0) if c["--model"] == "openai/gpt-4.1"]
+    assert {c["--config"] for c in orr} == {"ADAPTIVE"}
+
+
+def test_smoke_dry_run_plan(tmp_path, monkeypatch):
+    cells = _plan(monkeypatch, tmp_path, "stage_smoke")
+    assert {c["--config"] for c in cells} == {"NONE", "ADAPTIVE_RULES"} and len(cells) == 2 * 4 * 2
+    assert all(c["--n"] == "1" and c["--inj"] == "injection_task_0" and c["--model"] == "gpt-oss:20b" for c in cells)
+
+
+def _tree_v4(tmp: Path) -> Path:
+    runs = tmp / "runs"
+    for ut, u in (("user_task_0", True), ("user_task_1", True)):
+        _log(runs, "NONE", "gpt-oss:120b", "workspace", ut, "none", "none", u, False)
+    for ut, u in (("user_task_0", True), ("user_task_1", False), ("user_task_100", False), ("user_task_103", False)):
+        _log(runs, "ADAPTIVE", "gpt-oss:120b", "workspace", ut, "none", "none", u, False)
+    _log(runs, "ADAPTIVE", "gpt-oss:120b", "workspace", "user_task_0", "important_instructions", "injection_task_0",
+         False, False)
+    _log(runs, "ADAPTIVE", "gpt-oss:120b", "workspace", "user_task_101", "important_instructions", "injection_task_0",
+         True, True)  # carrier: must not count as a successful attack
+    rows = [{"provider": "ollama", "key": "A", "model": "gpt-oss:120b", "config": "ADAPTIVE", "est_usd": 0.5,
+             "logdir": str(runs / "mad/ADAPTIVE/gpt-oss:120b")},
+            {"provider": "ollama", "key": "B", "model": "gpt-oss:120b", "config": "ADAPTIVE", "est_usd": 0.25},
+            {"provider": "openrouter", "model": "openai/gpt-4.1", "config": "ADAPTIVE", "est_usd": 1.0},
+            {"model": "gpt-oss:20b", "config": "NONE", "est_usd": 9.9,      # old row: no provider/key/logdir;
+             "prompt_tokens": 1e6, "completion_tokens": 0},                  # repriced from tokens (B.row_usd)
+            {"model": "gpt-4.1", "config": "NONE", "est_usd": 0.2},          # old row: pre-C16 = OpenAI direct
+            # reservation superseded by its final row (same run_id) -> dropped, as the gate does (B.live)
+            {"provider": "openrouter", "model": "openai/gpt-4.1", "config": "STATIC", "est_usd": 5.0, "reserved": True,
+             "run_id": "x", "ts": 1e12},
+            {"provider": "openrouter", "model": "openai/gpt-4.1", "config": "STATIC", "est_usd": 0.5, "run_id": "x"}]
+    (runs / "mad" / "spend.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows) + "not json\n")
+    return runs
+
+
+def test_retention_exclusion_spend_missing_vs_fail(tmp_path):
+    import yaml
+    from loop import compare, metrics
+    m = metrics.compute(_tree_v4(tmp_path), "mad", tmp_path / "res")
+    a = m["runs"]["ADAPTIVE"]["gpt-oss:120b"]
+    assert a["n_user_tasks"] == 2 and a["n_injected"] == 1 and a["asr"] == 0.0  # user_task_10x excluded
+    assert a["utility_no_attack"] == 50.0 and a["utility_retention"] == 50.0 and a["est_usd"] == 0.75
+    assert m["runs"]["NONE"]["gpt-oss:120b"]["utility_retention"] == 100.0
+    from bench import budget as B
+    bud = yaml.safe_load(metrics.BUDGET.read_text())
+    rows = [json.loads(x) for x in (tmp_path / "runs/mad/spend.jsonl").read_text().splitlines()[:-1]]
+    for prov, usd in m["spend"]["by_provider"].items():  # same numbers as the budget gate
+        assert usd == round(B.spent(rows, prov, bud), 4)
+    assert m["spend"]["by_provider"]["openrouter"] == 1.5 and m["spend"]["by_ollama_key"]["A"] == 0.5
+    assert m["spend"]["by_ollama_key"]["?"] == round(B.price("gpt-oss:20b", bud)[0], 4)  # repriced, not 9.9
+    tg = yaml.safe_load(compare.TARGETS.read_text())["targets"]
+    st = {r["id"]: r["status"] for r in compare.check(m, tg)}
+    assert st["asr_adaptive"] == "MISSING" and st["util_retention"] == "MISSING"  # only workspace run, targets need 4
+    a["suites"] = ["banking", "slack", "travel", "workspace"]
+    st = {r["id"]: r["status"] for r in compare.check(m, tg)}
+    assert st["asr_adaptive"] == "PASS" and st["util_retention"] == "FAIL"
+    assert st["h3_deepseek"] == "MISSING" and st["anchor_util"] == "MISSING" and st["decider_f1"] == "MISSING"
+    # anchor ASR needs >= 100 injected episodes -> MISSING (not PASS) on a small sample
+    m["runs"]["ADAPTIVE"]["gpt-4.1"] = {"asr": 0.0, "n_injected": 5}
+    assert {r["id"]: r["status"] for r in compare.check(m, compare.yaml.safe_load(compare.TARGETS.read_text())["targets"])
+            }["anchor_asr"] == "MISSING"
+    # compare.run on a metrics.json with no runs at all: all MISSING, no crash
+    (tmp_path / "empty.json").write_text(json.dumps({"runs": {}, "decider": {}}))
+    assert compare.run(tmp_path / "empty.json", tmp_path / "it") is False
+    assert json.loads((tmp_path / "it" / "compare.json").read_text())["counts"]["FAIL"] == 0
 
 
 def test_regression_flagged(tmp_path):
@@ -127,3 +242,40 @@ def test_make_metrics(tmp_path):
                        cwd=ROOT, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     assert (tmp_path / "res" / "metrics.json").exists()
+
+
+def test_retention_needs_same_suites(tmp_path):
+    from loop import metrics
+    runs = _tree_v4(tmp_path)
+    _log(runs, "ADAPTIVE", "gpt-oss:120b", "banking", "user_task_0", "none", "none", True, False)
+    a = metrics.compute(runs, "mad", tmp_path / "res")["runs"]["ADAPTIVE"]["gpt-oss:120b"]
+    assert a["suites"] == ["banking", "workspace"] and a["utility_retention"] is None and a["utility_delta_vs_none"] is None
+
+
+def test_tag_events_only_new_bytes(tmp_path):
+    from loop import loop as L
+    src = tmp_path / "events-workspace.jsonl"
+    src.write_text("mixed-old-1\nmixed-old-2\n")  # supervise.py's mixed-attack lines: must stay untagged
+    off = L.events_size(tmp_path, "workspace")
+    with src.open("a") as f:
+        f.write("new\n")
+    L.tag_events(tmp_path, "workspace", "none", off)
+    assert (tmp_path / "events-workspace.none.jsonl").read_text() == "new\n"
+    assert src.read_text() == "mixed-old-1\nmixed-old-2\n"
+
+
+def test_gate_error_is_failure_not_skip(tmp_path, monkeypatch):
+    from loop import loop as L
+
+    class R:
+        def __init__(self, rc, out, err=""):
+            self.returncode, self.stdout, self.stderr = rc, out, err
+
+    res = {"crash": R(1, "", "Traceback ...\n"), "nokey": R(2, "", "REFUSE no key\n"),
+           "budget": R(2, "GATE REFUSE allowed=False reason=cap\n")}
+    monkeypatch.setattr(L.subprocess, "run", lambda cmd, **k: res[cmd[1]])
+    assert L.gate(["py", "crash"]) is None and L.gate(["py", "nokey"]) is None and L.gate(["py", "budget"]) is False
+    monkeypatch.setattr(L, "gate", lambda cmd: None)
+    monkeypatch.setattr(L.subprocess, "Popen", lambda *a, **k: (_ for _ in ()).throw(AssertionError("launched")))
+    bad = L.suites_parallel("NONE", {"model": "gpt-oss:20b", "suites": ["workspace"], "attacks": ["none"]}, tmp_path)
+    assert bad == ["NONE/gpt-oss:20b/workspace/none (gate error)"]

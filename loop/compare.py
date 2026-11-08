@@ -26,8 +26,9 @@ def value(m: dict, t: dict):
     if t["metric"].startswith("decider."):
         return m.get("decider", {}).get(t["metric"].split(".", 1)[1])
     c = _model(m.get("runs", {}).get(t.get("config", ""), {}), t.get("model", ""))
-    if c is None or (t.get("min_n") and (c.get("n_injected") or 0) < t["min_n"]):
-        return None  # runs not there yet (or sample too small) -> MISSING
+    if (c is None or (t.get("min_n") and (c.get("n_injected") or 0) < t["min_n"])
+            or not set(t.get("suites", [])) <= set(c.get("suites") or [])):
+        return None  # runs not there yet (sample too small, or required suites not all run) -> MISSING
     return c.get(t["metric"])
 
 
