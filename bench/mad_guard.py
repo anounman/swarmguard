@@ -160,8 +160,11 @@ def make_pipeline(config, model_id: str, provider_env: dict, monitor_cfg: dict |
         client = client or openai.OpenAI(
             base_url=provider_env["OPENAI_COMPATIBLE_BASE_URL"], api_key=provider_env["OPENAI_COMPATIBLE_API_KEY"]
         )
-        # ponytail: Kimi K3.1 Pro (Command Code) rejects temperature != 1; everything else keeps the fork's 0.0
-        llm = UsageOpenAILLM(client, model_id, temperature=1.0 if "kimi" in model_id.lower() else 0.0)
+        # ponytail: provider quirks on the temperature knob (C28). Kimi K3.1 Pro (Command Code) rejects temperature != 1;
+        # Claude 5.5 via Anthropic's OpenAI-compat endpoint rejects the parameter outright ("deprecated for this model")
+        # -> None = omit it; everything else keeps the fork's 0.0.
+        m = model_id.lower()
+        llm = UsageOpenAILLM(client, model_id, temperature=1.0 if "kimi" in m else (None if "claude" in m else 0.0))
     sysmsg = load_system_message(None)
     if config == GuardConfig.NONE:
         mad = MultiAgentPipeline(llm, sysmsg)  # vanilla MAD baseline
