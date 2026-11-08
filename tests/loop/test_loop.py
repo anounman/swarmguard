@@ -300,3 +300,32 @@ def test_gate_error_is_failure_not_skip(tmp_path, monkeypatch):
     monkeypatch.setattr(L.subprocess, "Popen", lambda *a, **k: (_ for _ in ()).throw(AssertionError("launched")))
     bad = L.suites_parallel("NONE", {"model": "gpt-oss:20b", "suites": ["workspace"], "attacks": ["none"]}, tmp_path)
     assert bad == ["NONE/gpt-oss:20b/workspace/none (gate error)"]
+
+
+def test_retention_gates_on_benign_suites(tmp_path):
+    # NONE: injected in banking+slack but benign only in banking -> STATIC (benign in both) has no like-for-like base
+    from loop import metrics
+    runs = tmp_path / "runs"
+    _log(runs, "NONE", "m", "banking", "user_task_0", "none", "none", True, False)
+    for su in ("banking", "slack"):
+        _log(runs, "NONE", "m", su, "user_task_0", "important_instructions", "injection_task_0", True, True)
+        _log(runs, "STATIC", "m", su, "user_task_0", "none", "none", True, False)
+    _log(runs, "STATIC", "m", "slack", "user_task_0", "important_instructions", "injection_task_0", True, False)
+    s = metrics.compute(runs, "mad", tmp_path / "res")["runs"]["STATIC"]["m"]
+    assert s["suites"] == ["banking", "slack"] and s["benign_suites"] == ["banking", "slack"]
+    assert s["utility_retention"] is None and s["utility_delta_vs_none"] is None
+
+
+def test_orchestrator_kill_dangling_sink(tmp_path):
+    # top-level KILL: log ends on the assistant's sink call, no tool result, error None -> killed under ADAPTIVE*
+    from loop import metrics
+    runs = tmp_path / "runs"
+    for cfg in ("ADAPTIVE_RULES", "NONE"):
+        _log(runs, cfg, "m", "banking", "user_task_0", "important_instructions", "injection_task_4", False, False)
+        f = next((runs / "mad" / cfg).rglob("injection_task_4.json"))
+        d = json.loads(f.read_text())
+        d["messages"][-1] = {"role": "assistant", "content": None, "tool_calls": [
+            {"function": "update_scheduled_transaction", "args": {}, "id": "c9", "placeholder_args": None}]}
+        f.write_text(json.dumps(d))
+    m = metrics.compute(runs, "mad", tmp_path / "res")["runs"]
+    assert m["ADAPTIVE_RULES"]["m"]["killed_runs"] == 1 and m["NONE"]["m"]["killed_runs"] == 0  # NONE: cutoff

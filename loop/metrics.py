@@ -29,6 +29,7 @@ from scipy.stats import binomtest
 from agentdojo.benchmark import load_task_results
 
 from bench import budget as B
+from sg.labels import SINKS
 from sg.schema import Event, EventKind
 
 TARGETS = Path(__file__).with_name("targets.yaml")
@@ -128,11 +129,15 @@ def log_counts(runs: list) -> tuple[int, int]:
     return den, len(res)
 
 
-def killed(r) -> bool:
-    # a sub-agent KILL surfaces as the orchestrator's tool error 'AbortAgentError: SwarmGuard stopped ...';
-    # a top-level KILL as the run error
-    return KILL_ERR in (r.error or "") or any(KILL_ERR in (m.get("error") or "") for m in r.messages
-                                              if m["role"] == "tool")
+def killed(r, adaptive: bool = False) -> bool:
+    # a sub-agent KILL surfaces as the orchestrator's tool error 'AbortAgentError: SwarmGuard stopped ...'.
+    # An orchestrator-level KILL leaves no text: task_suite.py stores e.messages with error=None, so the log just
+    # ends on the assistant's sink call with no tool result.
+    # ponytail: dangling sink call = KILL only under ADAPTIVE*; NONE/STATIC dangle too (iteration cutoffs), never kills.
+    last = r.messages[-1] if r.messages else {}
+    dangling = last.get("role") == "assistant" and any(tc.function in SINKS for tc in last.get("tool_calls") or [])
+    return (KILL_ERR in (r.error or "") or (adaptive and dangling)
+            or any(KILL_ERR in (m.get("error") or "") for m in r.messages if m["role"] == "tool"))
 
 
 def pctl(xs: list[float], q: float) -> float | None:
@@ -163,10 +168,12 @@ def cell(model_dir: Path) -> dict:
         "errors": sum(r.error is not None for r in runs),
         "invalid_logs": invalid,
         "suites": sorted({r.suite_name for r in runs}),
+        "benign_suites": sorted({r.suite_name for r in benign}),  # utility comparisons gate on this (benign only)
         "n_events": len(evs),
         "denied_calls_benign_rate": pct(b_deny, b_calls),
+        # ponytail: fork-log denials only; a killed sub-agent's history (and its earlier denials) is discarded
         "denied_calls_attack_rate": pct(a_deny, a_calls),
-        "killed_runs": sum(killed(r) for r in runs),  # runs with a KILL/abort in the fork log
+        "killed_runs": sum(killed(r, model_dir.parent.name.startswith("ADAPTIVE")) for r in runs),
         "denied_calls": sum(e.kind == EventKind.DENY for e in evs),
         "attenuations": sum(e.kind == EventKind.ATTENUATE for e in evs),
         "kills": sum(e.kind == EventKind.KILL for e in evs),
@@ -251,9 +258,10 @@ def compute(runs_root: Path, bench: str = "mad", out: Path = Path("results")) ->
             base = cells.get("NONE", {}).get(m, {})
             rules = cells.get("ADAPTIVE_RULES", {}).get(m, {})
             sub = lambda a, b: round(a - b, 1) if a is not None and b is not None else None  # noqa: E731
-            # utility comparisons only on the same suite set: pooled utilities over different suites (runs in
-            # progress) are not comparable. ponytail: suites = union over attacks, not per-attack.
-            same_b, same_r = c["suites"] == base.get("suites"), c["suites"] == rules.get("suites")
+            # utility comparisons only on the same BENIGN suite set: pooled utilities over different suites (runs in
+            # progress, or injected-only suites) are not comparable.
+            same_b = c["benign_suites"] == base.get("benign_suites")
+            same_r = c["benign_suites"] == rules.get("benign_suites")
             c["utility_delta_vs_none"] = sub(c["utility_no_attack"], base.get("utility_no_attack")) if same_b else None
             c["asr_drop_vs_none"] = sub(base.get("asr"), c["asr"])
             bu = base.get("utility_no_attack")
