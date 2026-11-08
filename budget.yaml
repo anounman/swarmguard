@@ -8,21 +8,50 @@ providers:
     keys:
       A: OLLAMA_API_KEY        # env
       B: OLLAMA_API_KEY1       # ~/.zshrc only; export before use
+  commandcode:                 # C14 (07:00 CET): commandcode.ai GOAT plan
+    base_url: https://api.commandcode.ai/provider/v1   # /chat/completions (OpenAI) · /messages (Anthropic, x-api-key)
+    key_env: COMMAND_CODE_API  # value in ~/.zshrc; session env may be stale -> re-read from rc
+    window_5h_usd: 20
+    window_7d_usd: 50
+    month_usd: 100
+    reserve_usd: 5
+    max_concurrent: 3          # assumed ("Standard" rate limits); back off on 429
+    not_in_plan: [gpt-5.5, claude-fable-5, claude-opus-*]
+  openrouter:                  # C16 (07:50 CET): user topped up $10
+    base_url: https://openrouter.ai/api/v1
+    key_env: OPENROUTER_API_KEY   # ~/.zshrc (session env stale)
+    cap_usd: 9.5
+    allowed_models: [openai/gpt-4.1]
+    purpose: paper anchor only
+  groq:
+    allowed: false             # C15: key capped at 8,000 tokens/min -> unusable
   openai:
     allowed: false             # ~$2-3 credit left; never call
-  openrouter:
-    allowed: false             # credit exhausted ($25.00/$25.00) at 06:25 CET
 # prices USD per 1M tokens from ollama.com/pricing (input; output assumed ~4x input until measured)
 prices:
   gpt-oss:20b:      {input: 0.07, output_est: 0.30}
   gpt-oss:120b:     {input: 0.15, output_est: 0.60}
   deepseek-v4-pro:  {input: 0.66, output_est: 2.60, note: off-peak price, all weekend}
-  kimi-k3.1-pro:    {input: 3.00, output_est: 12.0, note: likely too expensive}
+  kimi-k3.1-pro:    {input: 3.00, output_est: 12.0, note: not used}
+  # Command Code (commandcode.ai/docs/resources/pricing-limits, per 1M tokens)
+  deepseek/deepseek-v4.1-flash: {input: 0.15, output: 0.60, provider: commandcode}
+  claude-haiku-5-5:             {input: 0.10, output: 0.50, provider: commandcode, endpoint: /messages, allowance_usd: 20, optional: true}
+  # OpenRouter
+  openai/gpt-4.1:               {input: 2.00, output: 8.00, provider: openrouter, note: paper anchor}
+# measured 08:00 on gpt-oss:20b smoke: ~6-7k tokens per injected episode, ~6k per benign; projection uses 8k
 # spend priority = run order; each row only after the previous is complete and the gate passes
 priority:
   - {model: gpt-oss:120b,   configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE], suites: all, role: headline}
   - {model: gpt-oss:20b,    configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE], suites: all, role: dumb tier}
-  - {model: deepseek-v4-pro, configs: [NONE, ADAPTIVE], suites: [workspace, banking], role: smart tier, only_if_remaining_usd_gt: 25}
+  # Command Code lane (independent of Ollama; obey 5h/7d windows)
+  - {provider: commandcode, model: deepseek/deepseek-v4.1-flash, configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE], suites: all, role: smart 1M tier}
+  - {provider: commandcode, model: claude-haiku-5-5, configs: [NONE, ADAPTIVE], suites: all, role: optional 4th tier, only_if: fork anthropic provider accepts base_url with no new code}
+  # OpenRouter lane: gpt-4.1 paper anchor (C16), cap $9.5 total
+  - {provider: openrouter, model: openai/gpt-4.1, configs: [NONE], note: already on disk (runs/mad/NONE/gpt-4.1, partial 329 episodes) - never extended}
+  - {provider: openrouter, model: openai/gpt-4.1, configs: [ADAPTIVE], suites: [workspace, banking], attack: none, role: anchor utility}
+  - {provider: openrouter, model: openai/gpt-4.1, configs: [ADAPTIVE], suites: [workspace], attack: important_instructions, n_episodes: 100, role: anchor ASR sample}
+  - {provider: openrouter, model: openai/gpt-4.1, configs: [STATIC], suites: [workspace, banking], attack: none, only_if_remaining_usd_gt: 3}
+  - {provider: ollama, model: deepseek-v4-pro, configs: [], note: dropped - smart tier moved to Command Code}
 monitors:
   smoke_model: gpt-oss:20b
   llm_monitor_model: gpt-oss:20b      # until swarmguard-decider is served

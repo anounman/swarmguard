@@ -24,4 +24,4 @@ uv run pytest -q
 ```
 
 ## Providers and budget
-All LLM calls go to **Ollama Cloud** (`https://ollama.com/v1`, OpenAI-compatible). `budget.yaml` holds the cap, keys, concurrency limit and model priority; the loop's bench stage refuses to launch a run whose projected cost exceeds the remaining budget. OpenAI and OpenRouter are not used in this project (see `PLAN.md` C13). `runs/mad/NONE/gpt-4.1/` is a partial undefended gpt-4.1 baseline recorded before that decision and is reported as partial.
+LLM calls go to three OpenAI-compatible providers, each model pinned to one: **Ollama Cloud** (gpt-oss:120b headline, gpt-oss:20b), **Command Code** (deepseek/deepseek-v4.1-flash smart tier), **OpenRouter** (gpt-4.1 paper anchor, small budget). The fork's `OPENAI_COMPATIBLE` provider is used unchanged. `budget.yaml` holds caps (including Command Code's $20/5 h and $50/7 d rolling windows), keys, concurrency and model priority; the loop's bench stage refuses to launch a run whose projected cost exceeds what is left (see `PLAN.md` C13–C16). `runs/mad/NONE/gpt-4.1/` is a partial undefended gpt-4.1 baseline recorded before that decision and is reported as partial.
