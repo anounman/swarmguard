@@ -171,6 +171,14 @@ def cell(model_dir: Path) -> dict:
         "benign_suites": sorted({r.suite_name for r in benign}),  # utility comparisons gate on this (benign only)
         "attack_suites": sorted({r.suite_name for r in attacked}),  # ua_gain_vs_static gates on this (C24)
         "n_events": len(evs),
+        # C27: per-suite breakdown — pooled utility/ASR are confounded by suite mix while cells are partial
+        # (workspace = 560/949 injected and the easiest suite); the report's per-suite table reads these keys.
+        "by_suite": {s: {"n_user_tasks": sum(r.suite_name == s for r in benign),
+                         "n_injected": sum(r.suite_name == s for r in attacked),
+                         "utility_no_attack": pct(sum(r.utility for r in benign if r.suite_name == s), sum(r.suite_name == s for r in benign)),
+                         "utility_under_attack": pct(sum(r.utility for r in attacked if r.suite_name == s), sum(r.suite_name == s for r in attacked)),
+                         "asr": pct(sum(r.security for r in attacked if r.suite_name == s), sum(r.suite_name == s for r in attacked))}
+                     for s in sorted({r.suite_name for r in runs})},
         "denied_calls_benign_rate": pct(b_deny, b_calls),
         # ponytail: fork-log denials only; a killed sub-agent's history (and its earlier denials) is discarded
         "denied_calls_attack_rate": pct(a_deny, a_calls),

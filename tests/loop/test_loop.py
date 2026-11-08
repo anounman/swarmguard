@@ -66,6 +66,14 @@ def run(*args, cwd=ROOT):
     return r.stdout
 
 
+
+@pytest.fixture(autouse=True)
+def _decider_version_2(monkeypatch):
+    """The v3 sub-step tests were written when loop/config.yaml decider.version was 2 (retrain builds v3).
+    Pin that so the real config (bumped as deciders ship, C25: version 3) does not move the expected tags."""
+    import loop.loop as L
+    monkeypatch.setitem(L.CFG["decider"], "version", 2)
+
 def test_metrics_compare_harvest_render(tmp_path):
     runs = fake_tree(tmp_path)
     res, loopdir, train = tmp_path / "results", tmp_path / "loop", tmp_path / "train"

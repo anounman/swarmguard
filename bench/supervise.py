@@ -27,6 +27,8 @@ def key_env() -> dict:
 
 def alive(c) -> bool:
     pat = f"run.py --bench mad --config {c[0]} --model {c[1]} --suite {c[2]} --attack {c[3]} "
+    if "--logdir" in c:  # C27: decider versions run as the same config with their own --logdir; match only this one
+        pat += f".*--logdir {c[c.index('--logdir') + 1]}"
     return subprocess.run(["pgrep", "-f", pat], capture_output=True).returncode == 0
 
 def marker(c) -> Path:
