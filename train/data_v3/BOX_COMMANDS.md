@@ -36,8 +36,10 @@ Base = `ninty-seven/StepGuard` (orchestrator decision 08:40 CET, PLAN §8a item 
 ## c. Export -> Ollama as `swarmguard-decider:v3` (box)
 `export.sh` ends with `ollama create swarmguard-decider` (untagged), which would overwrite the v2 model, so run its steps with the v3 tag:
 ```bash
-cd ~/swarmguard-train && . .venv/bin/activate
-python llama.cpp/convert_hf_to_gguf.py out/decider_v3/merged --outfile decider-f16.gguf --outtype f16
+cd ~/swarmguard-train    # conversion uses the ISOLATED .venv-gguf (llama.cpp reqs pin CPU torch; never install them into .venv)
+bash train/export.sh out/decider_v3/merged swarmguard-decider:v3    # = drop list extra_special_tokens, .venv-gguf convert, ollama create <tag>
+# or by hand:
+.venv-gguf/bin/python llama.cpp/convert_hf_to_gguf.py out/decider_v3/merged --outfile decider-f16.gguf --outtype f16
 ollama create swarmguard-decider:v3 -q q4_K_M -f Modelfile
 ollama list | grep swarmguard-decider && ollama run swarmguard-decider:v3 --format json < /dev/null
 ```
