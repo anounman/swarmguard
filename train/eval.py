@@ -24,9 +24,9 @@ def endpoint_fn(url, model, key):
 
     def f(msgs):
         # Claude 5.5 via Anthropic's OpenAI-compat endpoint rejects `temperature` -> omit it for claude judges (C30)
-        temp = {} if "claude" in model.lower() else {"temperature": 0}
-        r = cli.chat.completions.create(model=model, messages=msgs, **temp, max_tokens=1024,  # reasoning baselines (gpt-oss) spend tokens before JSON
-                                        response_format={"type": "json_object"})
+        # ... and the compat layer also rejects response_format=json_object, so Claude judges get neither (JSON asked in the prompt)
+        extra = {} if "claude" in model.lower() else {"temperature": 0, "response_format": {"type": "json_object"}}
+        r = cli.chat.completions.create(model=model, messages=msgs, max_tokens=1024, **extra)  # reasoning baselines (gpt-oss) spend tokens before JSON
         return r.choices[0].message.content or ""
 
     return f

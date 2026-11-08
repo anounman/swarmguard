@@ -261,6 +261,7 @@ class Event(BaseModel):
     latency_ms: float | None = None
     reason: str | None = None  # deny reason / verdict rationale
     meta: dict[str, Any] = Field(default_factory=dict)
+    prev: str | None = None  # sha256 of this run's previous JSONL line (sg.log hash chain)
 
 
 # ---------------------------------------------------------------- verdicts
