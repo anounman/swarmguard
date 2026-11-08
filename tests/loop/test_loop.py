@@ -1,5 +1,6 @@
 """Offline loop check on a fake runs/ tree: metrics -> compare -> harvest -> report render (no network)."""
 import json
+import pytest
 import subprocess
 import sys
 from pathlib import Path
