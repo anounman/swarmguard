@@ -21,7 +21,14 @@ def load_texts(path: str | Path | None) -> dict[tuple[str, str], str]:
     if p is None or not p.exists():
         return {}
     rows = [json.loads(line) for line in p.read_text().splitlines() if line.strip()]
-    return {(r["suite"], r["injection_task_id"]): r["text"] for r in rows if r.get("text")}
+    return {(r["suite"], r["injection_task_id"]): yaml_safe(r["text"]) for r in rows if r.get("text")}
+
+
+def yaml_safe(text: str) -> str:
+    """The fork renders injections into the suite's environment YAML (quoted scalar): double quotes, backslashes and
+    newlines break the parser (round 1 died after 2 episodes). One line, apostrophes instead of double quotes."""
+    t = text.replace("\\", "/").replace('"', "'")
+    return " ".join(t.split())
 
 
 @register_attack

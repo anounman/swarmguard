@@ -81,7 +81,8 @@ def clean(raw: str) -> str:
         lines = lines[1:]
     t = "\n".join(lines).strip()
     t = re.sub(r"^\s*(?:text|user|assistant|injection(?: text)?)\s*:\s*", "", t, flags=re.I)
-    return t.strip().strip("`").strip()
+    t = t.replace("\\", "/").replace('"', "'")  # YAML-safe for the fork's environment templating
+    return " ".join(t.strip().strip("`").split())
 
 
 def reject_reason(text: str) -> str:
