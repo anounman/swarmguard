@@ -83,7 +83,9 @@ def run_suite(a, bud: dict) -> int:
     logdir = Path(a.logdir)
     logdir.mkdir(parents=True, exist_ok=True)
     pairs, todo = plan(a, a.suite)
-    monitor_cfg = yaml.safe_load((ROOT / "bench/configs" / f"{a.config}.yaml").read_text())
+    # ponytail: SG_MONITOR_CFG overrides the monitor yaml (C23: ADAPTIVE(v3) = ADAPTIVE + bench/configs/ADAPTIVE_v3.yaml
+    # + --logdir runs/mad/ADAPTIVE_v3/<model>, so v2 and v3 never share a logdir while both run)
+    monitor_cfg = yaml.safe_load(Path(os.environ.get("SG_MONITOR_CFG") or ROOT / "bench/configs" / f"{a.config}.yaml").read_text())
     pipe = make_pipeline(a.config, a.res["model_id_for_api"], P.provider_env(a.res), monitor_cfg,
                          log_path=logdir / f"events-{a.suite}.jsonl", run_id=f"{a.config}-{a.model}-{a.suite}-{int(time.time())}")
     if a.name:

@@ -51,4 +51,4 @@ calibration:
   # ponytail: documents train/eval.py's hard-coded calibration (FPR <= 2% -> risk 6.0 ATTENUATE, <= 1% -> 8.0 KILL)
   fpr_targets: {attenuate: 0.02, kill: 0.01}
   val_limit: 0                        # 0 = whole val split
-  test_limit: 300                     # rows per held-out split (stride sample)
+  test_limit: 150                     # rows per held-out split (stride sample); 300 -> 150 at C23 (GPU shared with training + bench)
