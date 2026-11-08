@@ -4,5 +4,5 @@ ADAPTIVE openai/gpt-4.1 workspace none -
 ADAPTIVE openai/gpt-4.1 banking none -
 ADAPTIVE openai/gpt-4.1 workspace important_instructions - --max-episodes 100
 # STATIC benign only if > $3 remain (budget.yaml priority): uncomment after the three cells above finish.
-# STATIC openai/gpt-4.1 workspace none -
-# STATIC openai/gpt-4.1 banking none -
+STATIC openai/gpt-4.1 workspace none -
+STATIC openai/gpt-4.1 banking none -
