@@ -1,0 +1,21 @@
+# C29: open-weight models on Ollama Cloud. deepseek-v4.1-flash (bare id) -> ollama; own logdir so it never mixes with the
+# Command Code lane (runs/mad/<CFG>/deepseek-v4.1-flash). banking/slack/travel only (workspace = 560 eps/config, over budget).
+# Launch: SG_DECIDER_HOST=http://192.168.0.146:11434/v1 SG_DONE_DIR=runs/mad/.done_ollama_open uv run python bench/supervise.py bench/cells_ollama_open.txt --max-live 6
+NONE deepseek-v4.1-flash banking important_instructions A --logdir runs/mad/NONE/deepseek-v4.1-flash-ollama
+NONE deepseek-v4.1-flash banking none A --logdir runs/mad/NONE/deepseek-v4.1-flash-ollama
+NONE deepseek-v4.1-flash slack important_instructions B --logdir runs/mad/NONE/deepseek-v4.1-flash-ollama
+NONE deepseek-v4.1-flash slack none B --logdir runs/mad/NONE/deepseek-v4.1-flash-ollama
+NONE deepseek-v4.1-flash travel important_instructions B --logdir runs/mad/NONE/deepseek-v4.1-flash-ollama
+NONE deepseek-v4.1-flash travel none B --logdir runs/mad/NONE/deepseek-v4.1-flash-ollama
+STATIC deepseek-v4.1-flash banking important_instructions A --logdir runs/mad/STATIC/deepseek-v4.1-flash-ollama
+STATIC deepseek-v4.1-flash banking none A --logdir runs/mad/STATIC/deepseek-v4.1-flash-ollama
+STATIC deepseek-v4.1-flash slack important_instructions B --logdir runs/mad/STATIC/deepseek-v4.1-flash-ollama
+STATIC deepseek-v4.1-flash slack none B --logdir runs/mad/STATIC/deepseek-v4.1-flash-ollama
+STATIC deepseek-v4.1-flash travel important_instructions B --logdir runs/mad/STATIC/deepseek-v4.1-flash-ollama
+STATIC deepseek-v4.1-flash travel none B --logdir runs/mad/STATIC/deepseek-v4.1-flash-ollama
+ADAPTIVE deepseek-v4.1-flash banking important_instructions A --logdir runs/mad/ADAPTIVE/deepseek-v4.1-flash-ollama
+ADAPTIVE deepseek-v4.1-flash banking none A --logdir runs/mad/ADAPTIVE/deepseek-v4.1-flash-ollama
+ADAPTIVE deepseek-v4.1-flash slack important_instructions B --logdir runs/mad/ADAPTIVE/deepseek-v4.1-flash-ollama
+ADAPTIVE deepseek-v4.1-flash slack none B --logdir runs/mad/ADAPTIVE/deepseek-v4.1-flash-ollama
+ADAPTIVE deepseek-v4.1-flash travel important_instructions B --logdir runs/mad/ADAPTIVE/deepseek-v4.1-flash-ollama
+ADAPTIVE deepseek-v4.1-flash travel none B --logdir runs/mad/ADAPTIVE/deepseek-v4.1-flash-ollama

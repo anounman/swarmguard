@@ -40,7 +40,11 @@ providers:
 prices:
   gpt-oss:20b:      {input: 0.07, output_est: 0.30}
   gpt-oss:120b:     {input: 0.15, output_est: 0.60}
-  deepseek-v4-pro:  {input: 0.66, output_est: 2.60, note: off-peak price, all weekend}
+  deepseek-v4-pro:  {input: 1.32, output: 3.96, provider: ollama, note: ollama.com/pricing 2026-11-08 (off-peak 0.66/1.98); not run (C29 budget)}
+  # C29 (18:45 CET, user via fork): open-weight models go to OLLAMA CLOUD, Command Code only for closed models.
+  # Bare id = Ollama; vendor-prefixed id = Command Code. Logdir suffix -ollama keeps the two deepseek lanes apart.
+  deepseek-v4.1-flash:          {input: 0.30, output: 1.20, provider: ollama, note: Ollama Cloud; cells bench/cells_ollama_open.txt (banking/slack/travel), logdir runs/mad/<CFG>/deepseek-v4.1-flash-ollama}
+  glm-5.3-flash:                {input: 0.15, output: 0.50, provider: ollama, note: candidate if budget remains (C29)}
   # Command Code (commandcode.ai/docs/resources/pricing-limits, per 1M tokens)
   deepseek/deepseek-v4.1-flash: {input: 0.15, output: 0.60, provider: commandcode}
   # claude-haiku-5-5: runs through Anthropic's OpenAI-compat layer (C17); price assumed, not in priority

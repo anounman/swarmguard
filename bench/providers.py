@@ -10,10 +10,12 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 BUDGET = ROOT / "budget.yaml"
 # legacy CLI names -> budget.yaml price keys. gpt-4.1 goes to OpenRouter, NEVER OpenAI direct (C13/C16).
-ALIASES = {"gpt-4.1": "openai/gpt-4.1", "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
+# C29: bare deepseek-v4.1-flash is the Ollama Cloud model (no longer an alias of the Command Code id)
+ALIASES = {"gpt-4.1": "openai/gpt-4.1",
            "kimi-k3.1-pro": "moonshotai/Kimi-K3.1-Pro"}
 OLLAMA_KEYS = {"A": "OLLAMA_API_KEY", "B": "OLLAMA_API_KEY1"}
-MODELS = ["gpt-oss:120b", "gpt-oss:20b", "deepseek/deepseek-v4.1-flash", "openai/gpt-4.1", "claude-haiku-5-5",
+MODELS = ["deepseek-v4.1-flash",  # C29: bare id = Ollama Cloud (vendor-prefixed deepseek/... = Command Code)
+          "gpt-oss:120b", "gpt-oss:20b", "deepseek/deepseek-v4.1-flash", "openai/gpt-4.1", "claude-haiku-5-5",
           "claude-sonnet-5-5", "claude-opus-5-5", "moonshotai/Kimi-K3.1-Pro", *ALIASES]
 
 

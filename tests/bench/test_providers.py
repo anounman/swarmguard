@@ -28,8 +28,10 @@ def test_legacy_gpt41_goes_to_openrouter_never_openai():
 def test_ollama_keys_and_commandcode():
     assert P.resolve("gpt-oss:120b", "B", BUD)["key_name"] == "OLLAMA_API_KEY1"
     assert P.resolve("gpt-oss:120b", None, BUD)["key_name"] == "OLLAMA_API_KEY"
-    r = P.resolve("deepseek-v4.1-flash", "A", BUD)
+    r = P.resolve("deepseek/deepseek-v4.1-flash", "A", BUD)
     assert (r["provider"], r["model_id_for_api"], r["key"]) == ("commandcode", "deepseek/deepseek-v4.1-flash", None)
+    r = P.resolve("deepseek-v4.1-flash", "A", BUD)  # C29: bare id = Ollama Cloud
+    assert (r["provider"], r["model_id_for_api"], r["key"]) == ("ollama", "deepseek-v4.1-flash", "A")
 
 
 def test_anthropic_compat_and_allowed_models():
