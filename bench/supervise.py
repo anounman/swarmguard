@@ -41,6 +41,6 @@ while True:
     live = [c for c in pending if alive(c)]
     for c in pending:
         if len(live) >= max_live: break
-        if not alive(c):
+        if not alive(c) and gate_allows(c):
             launch(c); live.append(c); time.sleep(2)
     time.sleep(60)

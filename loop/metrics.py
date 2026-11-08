@@ -116,6 +116,25 @@ def is_benign_event(e: Event) -> bool:
     return e.meta.get("attack") == "none" and not e.meta.get("injection_task_id")
 
 
+DENIED_PREFIX, DENY_ERR, KILL_ERR = "DENIED_", "PermissionError:", "AbortAgentError"  # sg/guard.py wording
+
+
+def log_counts(runs: list) -> tuple[int, int]:
+    """(denied, total) tool results in fork logs. Denied = sg/guard.py rename DENIED_<tool> or its 'PermissionError:'
+    error text (attenuation). ponytail: a native tool PermissionError would count too (none in NONE logs)."""
+    res = [m for r in runs for m in r.messages if m["role"] == "tool"]
+    den = sum((m.get("tool_call") and m["tool_call"].function.startswith(DENIED_PREFIX))
+              or (m.get("error") or "").startswith(DENY_ERR) for m in res)
+    return den, len(res)
+
+
+def killed(r) -> bool:
+    # a sub-agent KILL surfaces as the orchestrator's tool error 'AbortAgentError: SwarmGuard stopped ...';
+    # a top-level KILL as the run error
+    return KILL_ERR in (r.error or "") or any(KILL_ERR in (m.get("error") or "") for m in r.messages
+                                              if m["role"] == "tool")
+
+
 def pctl(xs: list[float], q: float) -> float | None:
     return round(float(np.percentile(xs, 100 * q)), 2) if xs else None
 
@@ -128,9 +147,9 @@ def cell(model_dir: Path) -> dict:
     attacked = [r for r in runs if (r.attack_type or "none") != "none"]
     ub, ua, sa = (sum(r.utility for r in benign), sum(r.utility for r in attacked), sum(r.security for r in attacked))
     evs = [e for e in load_events(model_dir) if "user_task_id" not in e.meta or real_task(e.meta["user_task_id"])]
-    ben = [e for e in evs if is_benign_event(e)]
-    b_deny = sum(e.kind == EventKind.DENY for e in ben)
-    b_calls = b_deny + sum(e.kind == EventKind.TOOL_CALL for e in ben)
+    b_deny, b_calls = log_counts(benign)  # from fork logs: events files may mix attack + benign (supervise.py)
+    a_deny, a_calls = log_counts(attacked)
+    # latency of a gateway check does not depend on the attack -> every events*.jsonl (tagged or not)
     lat = [e.latency_ms for e in evs if e.kind in (EventKind.DENY, EventKind.TOOL_CALL) and e.latency_ms is not None]
     return {
         "utility_no_attack": pct(ub, len(benign)),
@@ -146,9 +165,15 @@ def cell(model_dir: Path) -> dict:
         "suites": sorted({r.suite_name for r in runs}),
         "n_events": len(evs),
         "denied_calls_benign_rate": pct(b_deny, b_calls),
+        "denied_calls_attack_rate": pct(a_deny, a_calls),
+        "killed_runs": sum(killed(r) for r in runs),  # runs with a KILL/abort in the fork log
         "denied_calls": sum(e.kind == EventKind.DENY for e in evs),
         "attenuations": sum(e.kind == EventKind.ATTENUATE for e in evs),
         "kills": sum(e.kind == EventKind.KILL for e in evs),
+        "latency_p50_ms": pctl(lat, 0.50),
+        "latency_p95_ms": pctl(lat, 0.95),
+        "n_checks": len(lat),
+        # ponytail: old names kept as aliases, loop/targets.yaml (not ours to edit) reads p50_latency_ms
         "p50_latency_ms": pctl(lat, 0.50),
         "p95_latency_ms": pctl(lat, 0.95),
         "est_usd": None,
@@ -176,8 +201,8 @@ def spend_rows(bench_dir: Path, budget: dict | None = None) -> list[dict]:
     out = []
     for d in B.live(rows):
         prov, model = B.row_provider(d, budget), str(d.get("model"))
-        out.append({"ts": d.get("ts") or 0, "provider": prov, "key": d.get("key") or ("?" if prov == "ollama" else None),
-                    "config": str(d.get("config")), "usd": B.row_usd(d, budget),
+        out.append({"ts": d.get("ts") or 0, "provider": prov, "key": d.get("key") or "unknown",
+                    "model": model_dirname(model), "config": str(d.get("config")), "usd": B.row_usd(d, budget),
                     "mdir": Path(d["logdir"]).name if d.get("logdir") else model_dirname(model)})
     return out
 
@@ -190,15 +215,20 @@ def spend(bench_dir: Path) -> dict[tuple[str, str], float]:
 
 
 def spend_summary(bench_dir: Path) -> dict:
-    by_p: dict[str, float] = {}
+    budget = yaml.safe_load(BUDGET.read_text())
+    # every allowed provider present (0.0 if unspent) so docs/REPORT.md spend placeholders always resolve
+    by_p = {p: 0.0 for p, c in (budget.get("providers") or {}).items() if (c or {}).get("allowed", True)}
     by_k: dict[str, float] = {}
-    rows = spend_rows(bench_dir)
+    by_m: dict[str, float] = {}
+    rows = spend_rows(bench_dir, budget)
     for r in rows:
+        by_m[r["model"]] = by_m.get(r["model"], 0.0) + r["usd"]
         by_p[r["provider"]] = by_p.get(r["provider"], 0.0) + r["usd"]
         if r["provider"] == "ollama":
             by_k[r["key"]] = by_k.get(r["key"], 0.0) + r["usd"]
     rnd = lambda d: {k: round(v, 4) for k, v in sorted(d.items())}  # noqa: E731
-    return {"total_usd": round(sum(r["usd"] for r in rows), 4), "by_provider": rnd(by_p), "by_ollama_key": rnd(by_k)}
+    return {"total_usd": round(sum(r["usd"] for r in rows), 4), "by_provider": rnd(by_p), "by_ollama_key": rnd(by_k),
+            "by_model": rnd(by_m)}
 
 
 def ci_overlap(a: list | None, b: list | None) -> bool:
@@ -255,14 +285,14 @@ def to_markdown(m: dict) -> str:
          "Ours = measured from run logs (pooled over suites; ASR Wilson 95% CI, utility Wald 95% CI). "
          "ASR = % injected runs where the injection goal was achieved. Δ = ours − NONE (negative = utility cost).", "",
          "| Config | Model | Utility | 95% CI | Util. under attack | ASR | 95% CI | n benign | n injected | errors "
-         "| benign denied % | attenuate | kill | p50 ms | p95 ms | util Δ vs NONE | retention % | $ |",
-         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+         "| benign denied % | attack denied % | attenuate | killed runs | p50 ms | p95 ms | util Δ vs NONE | retention % | $ |",
+         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for cfg, models in m["runs"].items():
         for model, c in models.items():
             L.append("| " + " | ".join(fmt(x) for x in [
                 cfg, model, c["utility_no_attack"], c["utility_no_attack_ci"], c["utility_under_attack"], c["asr"],
                 c["asr_ci"], c["n_user_tasks"], c["n_injected"], c["errors"], c["denied_calls_benign_rate"],
-                c["attenuations"], c["kills"], c["p50_latency_ms"], c["p95_latency_ms"], c["utility_delta_vs_none"],
+                c["denied_calls_attack_rate"], c["attenuations"], c["killed_runs"], c["latency_p50_ms"], c["latency_p95_ms"], c["utility_delta_vs_none"],
                 c["utility_retention"], c["est_usd"]]) + " |")
     L += ["", "## Reference (reported, not replicated)†", "",
           "| Model | ASR none | ASR indiv-CaMeL | ASR multi-CaMeL | Util none | Util indiv-CaMeL | Util multi-CaMeL "
@@ -274,7 +304,7 @@ def to_markdown(m: dict) -> str:
           "Tab. V (utility, n=97); models via OpenRouter; not replicated by us.", ""]
     sp = m.get("spend", {})
     L += ["## Spend (est. USD)", "", f"total {sp.get('total_usd')} · by provider {sp.get('by_provider')} · "
-          f"Ollama by key {sp.get('by_ollama_key')}", ""]
+          f"Ollama by key {sp.get('by_ollama_key')} · by model {sp.get('by_model')}", ""]
     if m["decider"]:
         L += ["## Decider (offline, B3)", "", "```json", json.dumps(m["decider"], indent=2), "```", ""]
     return "\n".join(L)
