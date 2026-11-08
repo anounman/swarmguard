@@ -282,7 +282,7 @@ def compute(runs_root: Path, bench: str = "mad", out: Path = Path("results")) ->
             static = cells.get("STATIC", {}).get(m, {})
             same_a = c.get("attack_suites") == static.get("attack_suites")  # None == None when the key is absent
             c["ua_gain_vs_static"] = (sub(c["utility_under_attack"], static.get("utility_under_attack"))
-                                      if same_a and cfg == "ADAPTIVE" else None)
+                                      if same_a and cfg.startswith("ADAPTIVE") and cfg != "ADAPTIVE_RULES" else None)  # v2/v3/v3b
     dec_f = out / "decider_eval.json"
     return {
         "generated": time.strftime("%Y-%m-%d %H:%M:%S %Z"),
