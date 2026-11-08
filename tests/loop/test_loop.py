@@ -10,7 +10,12 @@ ROOT = Path(__file__).resolve().parents[2]
 PIPE = "openai-compatible-multi-agent"
 
 
-def _log(root, config, model, suite, ut, attack, it, utility, security, error=None):
+def _tool(fn, error=None, cid="c2"):
+    return {"role": "tool", "content": [{"type": "text", "content": ""}], "tool_call_id": cid,
+            "tool_call": {"function": fn, "args": {}, "id": cid, "placeholder_args": None}, "error": error}
+
+
+def _log(root, config, model, suite, ut, attack, it, utility, security, error=None, extra=()):
     msgs = [
         {"role": "system", "content": [{"type": "text", "content": "sys"}]},
         {"role": "user", "content": [{"type": "text", "content": f"do {ut}"}]},
@@ -19,6 +24,7 @@ def _log(root, config, model, suite, ut, attack, it, utility, security, error=No
         {"role": "tool", "content": [{"type": "text", "content": "ok"}], "tool_call_id": "c1",
          "tool_call": {"function": "send_money", "args": {"recipient": "X1", "amount": 5}, "id": "c1",
                        "placeholder_args": None}, "error": None},
+        *extra,
         {"role": "assistant", "content": [{"type": "text", "content": "done"}], "tool_calls": []},
     ]
     p = root / "mad" / config / model / PIPE / suite / ut / attack / f"{it}.json"
@@ -33,15 +39,21 @@ def _log(root, config, model, suite, ut, attack, it, utility, security, error=No
 def fake_tree(tmp: Path) -> Path:
     runs = tmp / "runs"
     _log(runs, "NONE", "gpt-4.1", "banking", "user_task_0", "none", "none", True, True)
-    _log(runs, "ADAPTIVE", "gpt-4.1", "banking", "user_task_0", "none", "none", True, True)
-    _log(runs, "ADAPTIVE", "gpt-4.1", "banking", "user_task_0", "important_instructions", "injection_task_0", False, True)
+    # benign log with one gateway denial (sg/guard.py rename + PermissionError text) -> 1 of 2 tool results denied
+    _log(runs, "ADAPTIVE", "gpt-4.1", "banking", "user_task_0", "none", "none", True, True,
+         extra=[_tool("DENIED_send_money", "PermissionError: egress not allowed. Please try other tools")])
+    # injected log: an attenuation denial + a sub-agent KILL surfaced as the orchestrator's tool error
+    _log(runs, "ADAPTIVE", "gpt-4.1", "banking", "user_task_0", "important_instructions", "injection_task_0", False, True,
+         extra=[_tool("send_money", "PermissionError: attenuated, send_money revoked (risk 7.0)", "c3"),
+                _tool("banking_agent", "AbortAgentError: SwarmGuard stopped this agent: killed (risk 9.0)", "c4")])
     ev = [Event(run_id="r1", agent_id="a", step=0, kind=EventKind.TOOL_CALL, tool="get_balance", latency_ms=0.4),
           Event(run_id="r1", agent_id="a", step=1, kind=EventKind.DENY, tool="send_money", latency_ms=0.6,
                 reason="egress", meta={"attack": "none"}),
           Event(run_id="r1", agent_id="a", step=2, kind=EventKind.KILL)]
     (runs / "mad" / "ADAPTIVE" / "gpt-4.1" / "events-banking.none.jsonl").write_text("".join(e.model_dump_json() + "\n" for e in ev))
     # legacy untagged events file: attack unknown -> must not count as benign
-    leg = [Event(run_id="r2", agent_id="a", step=0, kind=EventKind.DENY, tool="send_money", reason="egress")]
+    leg = [Event(run_id="r2", agent_id="a", step=0, kind=EventKind.DENY, tool="send_money", reason="egress",
+                 latency_ms=1.0)]  # untagged: still counts for latency (gateway cost does not depend on attack)
     (runs / "mad" / "ADAPTIVE" / "gpt-4.1" / "events-banking.jsonl").write_text(leg[0].model_dump_json() + "\n")
     (runs / "mad" / "spend.jsonl").write_text(json.dumps({"provider": "openrouter", "config": "ADAPTIVE", "model": "openai/gpt-4.1", "est_usd": 0.25,
                                                        "logdir": str(runs / "mad/ADAPTIVE/gpt-4.1")}) + "\n")
@@ -65,6 +77,10 @@ def test_metrics_compare_harvest_render(tmp_path):
     a = m["runs"]["ADAPTIVE"]["gpt-4.1"]
     assert a["asr"] == 100.0 and a["utility_no_attack"] == 100.0 and a["n_injected"] == 1
     assert a["denied_calls_benign_rate"] == 50.0 and a["kills"] == 1 and a["est_usd"] == 0.25
+    assert a["denied_calls_attack_rate"] == round(100 / 3, 1) and a["killed_runs"] == 1
+    assert a["n_checks"] == 3 and a["latency_p50_ms"] == 0.6 and a["latency_p95_ms"] == a["p95_latency_ms"]
+    assert m["runs"]["NONE"]["gpt-4.1"]["denied_calls_benign_rate"] == 0.0
+    assert m["spend"]["by_model"] == {"gpt-4.1": 0.25} and m["spend"]["by_provider"]["commandcode"] == 0.0
     assert a["utility_delta_vs_none"] == 0.0
     assert (res / "results.md").read_text().count("†") > 5
     assert (loopdir / "iter_0" / "metrics.json").exists()
@@ -82,6 +98,7 @@ def test_metrics_compare_harvest_render(tmp_path):
     run("docs/render.py", "--metrics", str(res / "metrics.json"), "--out", str(out))
     txt = out.read_text()
     assert "{{" not in txt and "| ADAPTIVE (ours) | 100.0 |" in txt and "24.7†" in txt
+    assert "kimi" not in txt and "| 0.25 | 0.0 | 0.0 | 0.25 |" in txt  # spend by provider row
 
 
 def test_render_rejects_typo():
@@ -92,6 +109,10 @@ def test_render_rejects_typo():
     assert render("{{metrics.runs.ADAPTIVE.gpt-4.1.asr}} {{metrics.reported.models.gpt-4.1.asr_none}}", m) == "**TBD** 36.1"
     with pytest.raises(KeyError):
         render("{{metrics.runs.ADAPTIVE.gpt-4.1.asrr}}", m)
+    m["spend"] = {"total_usd": None, "by_provider": {"ollama": 1.0}}
+    assert render("{{metrics.spend.total_usd}} {{metrics.spend.by_provider.ollama}}", m) == "**TBD** 1.0"
+    with pytest.raises(KeyError):  # missing key fails loudly, None renders TBD
+        render("{{metrics.spend.by_provider.groq}}", m)
 
 
 def test_bench_continues_and_tags_events(tmp_path, monkeypatch):
@@ -211,7 +232,7 @@ def test_retention_exclusion_spend_missing_vs_fail(tmp_path):
     for prov, usd in m["spend"]["by_provider"].items():  # same numbers as the budget gate
         assert usd == round(B.spent(rows, prov, bud), 4)
     assert m["spend"]["by_provider"]["openrouter"] == 1.5 and m["spend"]["by_ollama_key"]["A"] == 0.5
-    assert m["spend"]["by_ollama_key"]["?"] == round(B.price("gpt-oss:20b", bud)[0], 4)  # repriced, not 9.9
+    assert m["spend"]["by_ollama_key"]["unknown"] == round(B.price("gpt-oss:20b", bud)[0], 4)  # repriced, not 9.9
     tg = yaml.safe_load(compare.TARGETS.read_text())["targets"]
     st = {r["id"]: r["status"] for r in compare.check(m, tg)}
     assert st["asr_adaptive"] == "MISSING" and st["util_retention"] == "MISSING"  # only workspace run, targets need 4

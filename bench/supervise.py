@@ -26,6 +26,14 @@ def alive(c) -> bool:
 def marker(c) -> Path:
     return DONE / ("_".join(c[:4]).replace("/", "-").replace(":", "-") + ".done")
 
+def gate_allows(c) -> bool:
+    """Ask run.py --dry-run (no model calls). rc 0 = allow; rc 2 = budget/window refusal -> wait, do not count a try."""
+    r = subprocess.run(["uv", "run", "python", "bench/run.py", "--bench", "mad", "--config", c[0], "--model", c[1],
+                        "--suite", c[2], "--attack", c[3], "--key", c[4], "--dry-run"], capture_output=True, text=True, env=key_env())
+    if r.returncode == 2:
+        print(time.strftime("%H:%M:%S"), "gate refused, waiting:", *c[:4], (r.stdout.strip().splitlines() or [""])[-1][:160], flush=True)
+    return r.returncode == 0
+
 def launch(c):
     log = Path(f"runs/mad/{c[0]}/{c[1].rsplit('/', 1)[-1]}"); log.mkdir(parents=True, exist_ok=True)
     cmd = (f"uv run python bench/run.py --bench mad --config {c[0]} --model {c[1]} --suite {c[2]} --attack {c[3]} --key {c[4]} "
