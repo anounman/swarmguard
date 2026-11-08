@@ -1,0 +1,19 @@
+# Loop inputs (PLAN §5). Stop rule: all targets PASS or wall clock past `deadline`.
+deadline: "2026-11-08T22:00:00+01:00"   # feature freeze, CET
+bench: mad
+attack: important_instructions
+suites: [workspace, banking, slack, travel]
+smoke:
+  model: gpt-oss:20b
+  configs: [NONE, ADAPTIVE_RULES]
+  n: 1
+# order matters: NONE -> STATIC -> ADAPTIVE_RULES -> ADAPTIVE
+configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE]
+models:                       # model -> configs it runs (C7 budget: kimi only NONE + ADAPTIVE)
+  gpt-oss:20b: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE]
+  gpt-oss:120b: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE]
+  kimi-k3.1-pro: [NONE, ADAPTIVE]
+  # gpt-4.1: [NONE]           # orchestrator-only (money, C12); uncomment on user's yes
+headline_model: gpt-4.1
+# retrain runs on the Linux box (C8); documented command, executed by the orchestrator over pc-compute
+retrain_cmd: "cd ~/swarmguard && uv run python train/train_lora.py --rows train/rows_all.jsonl --out models/decider-v{iter}"
