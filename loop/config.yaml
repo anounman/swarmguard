@@ -1,25 +1,39 @@
 # Loop inputs (PLAN §5). Stop rule: all targets PASS or wall clock past `deadline`.
+# Money is budget.yaml's law (C13-C16): every bench/smoke cell first runs `bench/run.py ... --dry-run` (budget gate);
+# a refused cell is skipped and logged, never launched.
 deadline: "2026-11-08T22:00:00+01:00"   # feature freeze, CET
 bench: mad
+headline_model: gpt-oss:120b          # C13
 # each cell runs once per attack, sequentially: `none` = benign utility, the other = ASR.
 # (concurrent attacks in one logdir would interleave run.py's events-<suite>.jsonl)
 attacks: [none, important_instructions]
 suites: [workspace, banking, slack, travel]
-smoke:
+# Ollama pay-as-you-go = 3 concurrent requests per key -> 2 suite processes per key
+ollama_keys:
+  A: [workspace, banking]
+  B: [slack, travel]
+smoke:                                # PLAN §5 stage 2: 1 user task x 1 injection task per suite
   model: gpt-oss:20b
-  configs: [NONE, ADAPTIVE]     # PLAN §5 stage 2
+  configs: [NONE, ADAPTIVE_RULES]     # add ADAPTIVE once swarmguard-decider is served
   n: 1
-# order matters: NONE -> STATIC -> ADAPTIVE_RULES -> ADAPTIVE
-configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE]
-models:                       # model -> configs it runs (C7 budget: kimi only NONE + ADAPTIVE)
-  gpt-oss:20b: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE]
-  gpt-oss:120b: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE]
-  kimi-k3.1-pro: [NONE, ADAPTIVE]
-  # gpt-4.1: [NONE]           # orchestrator-only (money, C12); uncomment on user's yes
-# per-model suite override (C12: gpt-4.1 budgeted for 2 suites). run.py itself sets --name
-# openai-compatible-multi-agent for gpt-4.1 NONE, so the paid raw-fork-CLI baseline logs are resumed, not re-paid.
-model_suites:
-  gpt-4.1: [workspace, banking]
-headline_model: gpt-4.1
-# retrain runs on the Linux box (C8); documented command, executed by the orchestrator over pc-compute
-retrain_cmd: "cd ~/swarmguard && uv run python train/train_lora.py --rows train/rows_all.jsonl --out models/decider-v{iter}"
+  inj: injection_task_0               # first injection task id (exists in all 4 suites)
+# Lanes = budget.yaml priority. Lanes run concurrently (one thread each); within a lane items/configs run in order
+# (NONE -> STATIC -> ADAPTIVE_RULES -> ADAPTIVE); within a config the suites run as parallel processes.
+# Item keys: model, configs, suites (default all), attacks (default `attacks`), max_episodes, only_if_remaining_usd_gt.
+lanes:
+  ollama:
+    - {model: gpt-oss:120b, configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE]}   # headline
+    - {model: gpt-oss:20b,  configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE]}   # dumb tier
+  commandcode:
+    - {model: deepseek/deepseek-v4.1-flash, configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE]}  # smart-1M tier
+  openrouter:                         # gpt-4.1 paper anchor (C16), cap $9.5. NONE is on disk
+    # (runs/mad/NONE/gpt-4.1, pipeline openai-compatible-multi-agent, partial) and is never re-run.
+    - {model: openai/gpt-4.1, configs: [ADAPTIVE], suites: [workspace, banking], attacks: [none]}
+    - {model: openai/gpt-4.1, configs: [ADAPTIVE], suites: [workspace], attacks: [important_instructions], max_episodes: 100}
+    - {model: openai/gpt-4.1, configs: [STATIC], suites: [workspace, banking], attacks: [none], only_if_remaining_usd_gt: 3}
+# retrain runs on the Linux box (C8, train/README.md); executed by the orchestrator over pc-compute, after
+# merging train/rows_iter_*.jsonl into the box's data_v2 split and syncing it to ~/swarmguard-train
+retrain_cmd: >-
+  cd ~/swarmguard-train && export PATH=$HOME/.local/bin:$PATH && . .venv/bin/activate &&
+  nohup python train_lora.py --base Qwen/Qwen3-4B-Instruct-2507 --rows data_v2/train.jsonl --val data_v2/val.jsonl
+  --out out/decider_v2 > train_v2_iter{iter}.log 2>&1 &

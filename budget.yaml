@@ -8,7 +8,7 @@ providers:
     keys:
       A: OLLAMA_API_KEY        # env
       B: OLLAMA_API_KEY1       # ~/.zshrc only; export before use
-  commandcode:                 # C14 (07:00 CET): commandcode.ai GOAT plan
+  commandcode:                 # C14 (≈05:55 CET): commandcode.ai GOAT plan
     base_url: https://api.commandcode.ai/provider/v1   # /chat/completions (OpenAI) · /messages (Anthropic, x-api-key)
     key_env: COMMAND_CODE_API  # value in ~/.zshrc; session env may be stale -> re-read from rc
     window_5h_usd: 20
@@ -17,7 +17,7 @@ providers:
     reserve_usd: 5
     max_concurrent: 3          # assumed ("Standard" rate limits); back off on 429
     not_in_plan: [gpt-5.5, claude-fable-5, claude-opus-*]
-  openrouter:                  # C16 (07:50 CET): user topped up $10
+  openrouter:                  # C16 (≈06:25 CET): user topped up $10
     base_url: https://openrouter.ai/api/v1
     key_env: OPENROUTER_API_KEY   # ~/.zshrc (session env stale)
     cap_usd: 9.5
@@ -38,7 +38,7 @@ prices:
   claude-haiku-5-5:             {input: 0.10, output: 0.50, provider: commandcode, endpoint: /messages, allowance_usd: 20, optional: true}
   # OpenRouter
   openai/gpt-4.1:               {input: 2.00, output: 8.00, provider: openrouter, note: paper anchor}
-# measured 08:00 on gpt-oss:20b smoke: ~6-7k tokens per injected episode, ~6k per benign; projection uses 8k
+# measured 06:40 on gpt-oss:20b smoke + 120b run (≈7 s/episode): ~6-7k tokens per injected episode, ~6k per benign; projection uses 8k
 # spend priority = run order; each row only after the previous is complete and the gate passes
 priority:
   - {model: gpt-oss:120b,   configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE], suites: all, role: headline}

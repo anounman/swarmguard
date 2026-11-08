@@ -8,7 +8,11 @@ security=True in agentdojo == injection SUCCEEDED, so ASR = mean(security) over 
 Layout: <runs>/<bench>/<config>/<model>/<pipeline>/<suite>/<user_task>/<attack|none>/<inj|none>.json
         <runs>/<bench>/<config>/<model>/**/events-<suite>.<attack>.jsonl  (sg.schema.Event lines; loop.py renames
         run.py's events-<suite>.jsonl after each process so the attack is known; other events files = attack unknown)
-        <runs>/<bench>/spend.jsonl                          ({config, model, usd|est_usd|cost_usd, ...})
+        <runs>/<bench>/spend.jsonl     ({ts, provider, key, model, config, logdir, est_usd|usd|cost_usd, ...}; old rows
+                                        have no provider/key/logdir -> inferred from budget.yaml)
+Model dirs: a provider-prefixed model id is stored under its last path part (openai/gpt-4.1 -> gpt-4.1, so the anchor
+lands next to the on-disk NONE/gpt-4.1 baseline and docs/REPORT.md keys keep working).
+user_task_100..103 are bench/attacks carriers/twins registered on workspace -> excluded from utility/ASR.
 """
 from __future__ import annotations
 
@@ -27,6 +31,23 @@ from agentdojo.benchmark import load_task_results
 from sg.schema import Event, EventKind
 
 TARGETS = Path(__file__).with_name("targets.yaml")
+BUDGET = Path(__file__).resolve().parent.parent / "budget.yaml"
+CARRIER_MIN = 100  # user_task_100+ = bench/attacks carriers/twins, not MultiAgentDojo tasks
+
+
+def model_dirname(model: str) -> str:
+    return model.split("/")[-1]
+
+
+def provider_of(model: str, budget: dict | None = None) -> str:
+    budget = budget if budget is not None else yaml.safe_load(BUDGET.read_text())
+    return ((budget.get("prices") or {}).get(model) or {}).get("provider", "ollama")
+
+
+def real_task(tid) -> bool:
+    """A MultiAgentDojo user task (not an injection task run as a user task, not a carrier/twin)."""
+    tid = str(tid or "")
+    return tid.startswith("user_task_") and tid.rsplit("_", 1)[1].isdigit() and int(tid.rsplit("_", 1)[1]) < CARRIER_MIN
 
 
 def wilson(k: int, n: int) -> list[float] | None:
@@ -100,12 +121,12 @@ def pctl(xs: list[float], q: float) -> float | None:
 
 def cell(model_dir: Path) -> dict:
     runs, invalid = load_runs(model_dir)
-    # benchmark_suite_with_injections also runs injection tasks as user tasks -> exclude them
-    runs = [r for r in runs if r.user_task_id.startswith("user_task_")]
+    # benchmark_suite_with_injections also runs injection tasks as user tasks -> exclude them (+ carriers/twins)
+    runs = [r for r in runs if real_task(r.user_task_id)]
     benign = [r for r in runs if (r.attack_type or "none") == "none"]
     attacked = [r for r in runs if (r.attack_type or "none") != "none"]
     ub, ua, sa = (sum(r.utility for r in benign), sum(r.utility for r in attacked), sum(r.security for r in attacked))
-    evs = load_events(model_dir)
+    evs = [e for e in load_events(model_dir) if "user_task_id" not in e.meta or real_task(e.meta["user_task_id"])]
     ben = [e for e in evs if is_benign_event(e)]
     b_deny = sum(e.kind == EventKind.DENY for e in ben)
     b_calls = b_deny + sum(e.kind == EventKind.TOOL_CALL for e in ben)
@@ -133,23 +154,50 @@ def cell(model_dir: Path) -> dict:
         "utility_delta_vs_none": None,  # filled in compute()
         "asr_drop_vs_none": None,
         "utility_gain_vs_rules": None,
+        "utility_retention": None,  # % of own NONE utility (PLAN §6 H1, C13)
     }
 
 
-def spend(bench_dir: Path) -> dict[tuple[str, str], float]:
-    out: dict[tuple[str, str], float] = {}
+def spend_rows(bench_dir: Path, budget: dict | None = None) -> list[dict]:
+    """spend.jsonl rows normalised to {ts, provider, key, config, mdir, usd}; tolerates old rows without
+    provider/key/logdir and broken lines."""
+    budget = budget if budget is not None else yaml.safe_load(BUDGET.read_text())
     f = bench_dir / "spend.jsonl"
-    if not f.exists():
-        return out
-    for line in f.read_text().splitlines():
+    out = []
+    for line in f.read_text().splitlines() if f.exists() else []:
         try:
             d = json.loads(line)
         except Exception:
             continue
+        if not isinstance(d, dict):
+            continue
+        model = str(d.get("model"))
+        # ponytail: rows without provider predate C16; a bare gpt-4.1 then meant OpenAI direct (not OpenRouter)
+        prov = d.get("provider") or ("openai" if model == "gpt-4.1" else provider_of(model, budget))
         usd = next((d[k] for k in ("est_usd", "usd", "cost_usd") if isinstance(d.get(k), (int, float))), 0.0)
-        key = (str(d.get("config")), str(d.get("model")))
-        out[key] = out.get(key, 0.0) + usd
+        out.append({"ts": d.get("ts") or 0, "provider": prov, "key": d.get("key") or ("?" if prov == "ollama" else None),
+                    "config": str(d.get("config")), "usd": usd,
+                    "mdir": Path(d["logdir"]).name if d.get("logdir") else model_dirname(model)})
     return out
+
+
+def spend(bench_dir: Path) -> dict[tuple[str, str], float]:
+    out: dict[tuple[str, str], float] = {}
+    for r in spend_rows(bench_dir):
+        out[(r["config"], r["mdir"])] = out.get((r["config"], r["mdir"]), 0.0) + r["usd"]
+    return out
+
+
+def spend_summary(bench_dir: Path) -> dict:
+    by_p: dict[str, float] = {}
+    by_k: dict[str, float] = {}
+    rows = spend_rows(bench_dir)
+    for r in rows:
+        by_p[r["provider"]] = by_p.get(r["provider"], 0.0) + r["usd"]
+        if r["provider"] == "ollama":
+            by_k[r["key"]] = by_k.get(r["key"], 0.0) + r["usd"]
+    rnd = lambda d: {k: round(v, 4) for k, v in sorted(d.items())}  # noqa: E731
+    return {"total_usd": round(sum(r["usd"] for r in rows), 4), "by_provider": rnd(by_p), "by_ollama_key": rnd(by_k)}
 
 
 def ci_overlap(a: list | None, b: list | None) -> bool:
@@ -174,6 +222,8 @@ def compute(runs_root: Path, bench: str = "mad", out: Path = Path("results")) ->
             sub = lambda a, b: round(a - b, 1) if a is not None and b is not None else None  # noqa: E731
             c["utility_delta_vs_none"] = sub(c["utility_no_attack"], base.get("utility_no_attack"))
             c["asr_drop_vs_none"] = sub(base.get("asr"), c["asr"])
+            bu = base.get("utility_no_attack")
+            c["utility_retention"] = round(100 * c["utility_no_attack"] / bu, 1) if c["utility_no_attack"] is not None and bu else None
             c["utility_gain_vs_rules"] = (sub(c["utility_no_attack"], rules.get("utility_no_attack"))
                                           if ci_overlap(c["asr_ci"], rules.get("asr_ci")) else None)
     dec_f = out / "decider_eval.json"
@@ -181,6 +231,7 @@ def compute(runs_root: Path, bench: str = "mad", out: Path = Path("results")) ->
         "generated": time.strftime("%Y-%m-%d %H:%M:%S %Z"),
         "bench": bench,
         "runs": cells,
+        "spend": spend_summary(bench_dir),
         "decider": json.loads(dec_f.read_text()) if dec_f.exists() else {},
         "reported": yaml.safe_load(TARGETS.read_text())["reported"],
     }
@@ -199,15 +250,15 @@ def to_markdown(m: dict) -> str:
          "Ours = measured from run logs (pooled over suites; ASR Wilson 95% CI, utility Wald 95% CI). "
          "ASR = % injected runs where the injection goal was achieved. Δ = ours − NONE (negative = utility cost).", "",
          "| Config | Model | Utility | 95% CI | Util. under attack | ASR | 95% CI | n benign | n injected | errors "
-         "| benign denied % | attenuate | kill | p50 ms | p95 ms | util Δ vs NONE | $ |",
-         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+         "| benign denied % | attenuate | kill | p50 ms | p95 ms | util Δ vs NONE | retention % | $ |",
+         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for cfg, models in m["runs"].items():
         for model, c in models.items():
             L.append("| " + " | ".join(fmt(x) for x in [
                 cfg, model, c["utility_no_attack"], c["utility_no_attack_ci"], c["utility_under_attack"], c["asr"],
                 c["asr_ci"], c["n_user_tasks"], c["n_injected"], c["errors"], c["denied_calls_benign_rate"],
                 c["attenuations"], c["kills"], c["p50_latency_ms"], c["p95_latency_ms"], c["utility_delta_vs_none"],
-                c["est_usd"]]) + " |")
+                c["utility_retention"], c["est_usd"]]) + " |")
     L += ["", "## Reference (reported, not replicated)†", "",
           "| Model | ASR none | ASR indiv-CaMeL | ASR multi-CaMeL | Util none | Util indiv-CaMeL | Util multi-CaMeL "
           "| Util Δ multi vs none |", "|---|---|---|---|---|---|---|---|"]
@@ -216,6 +267,9 @@ def to_markdown(m: dict) -> str:
                  f"| {r['util_indiv']}† | {r['util_multi']}† | {round(r['util_multi'] - r['util_none'], 1)}† |")
     L += ["", f"† Reported in Peters-Gill et al. (2026), {m['reported']['source']}, Tab. III (ASR, n=949) / "
           "Tab. V (utility, n=97); models via OpenRouter; not replicated by us.", ""]
+    sp = m.get("spend", {})
+    L += ["## Spend (est. USD)", "", f"total {sp.get('total_usd')} · by provider {sp.get('by_provider')} · "
+          f"Ollama by key {sp.get('by_ollama_key')}", ""]
     if m["decider"]:
         L += ["## Decider (offline, B3)", "", "```json", json.dumps(m["decider"], indent=2), "```", ""]
     return "\n".join(L)
@@ -232,6 +286,7 @@ def main(argv: list[str] | None = None) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     (out / "metrics.json").write_text(json.dumps(m, indent=2))
     (out / "results.md").write_text(to_markdown(m))
+    (out / "spend.json").write_text(json.dumps(m["spend"], indent=2))  # PLAN R6: per provider + per ollama key
     print(f"metrics -> {out}/metrics.json, {out}/results.md")
     return m
 
