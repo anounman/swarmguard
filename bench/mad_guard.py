@@ -20,7 +20,7 @@ from agentdojo.agent_pipeline.llms.openai_llm import (
     _openai_to_assistant_message,
     chat_completion_request,
 )
-from agentdojo.agent_pipeline.multi_agent import MultiAgentPipeline, SubAgentSpec, _run_elements
+from agentdojo.agent_pipeline.multi_agent import MultiAgentPipeline, SubAgentSpec, _find_partition, _run_elements
 from agentdojo.agent_pipeline.tool_execution import ToolsExecutionLoop
 from agentdojo.functions_runtime import EmptyEnv, Function, FunctionsRuntime, TaskEnvironment
 from agentdojo.logging import Logger
@@ -48,7 +48,10 @@ def build_monitor(config: GuardConfig, monitor_cfg: dict | None):
     from sg.monitors import CascadeMonitor, LLMMonitor, RulesMonitor
 
     def llm(c):
-        return LLMMonitor(c["model"], c["base_url"], os.environ[c.get("key_env", "OLLAMA_API_KEY")])
+        # host_env (SG_DECIDER_HOST) set -> use host_model (swarmguard-decider) there, else the cloud stand-in
+        host = os.environ.get(c.get("host_env", ""), "")
+        model, url = (c["host_model"], host) if host else (c["model"], c["base_url"])
+        return LLMMonitor(model, url, os.environ.get(c.get("key_env", "OLLAMA_API_KEY"), "ollama"))
 
     cfg = monitor_cfg or {}
     if config == GuardConfig.ADAPTIVE_RULES:
@@ -99,13 +102,25 @@ class GuardedMultiAgentPipeline(MultiAgentPipeline):
     def __init__(self, llm, base_system_message, make_gateway, executor_cls, **kw):
         super().__init__(llm, base_system_message, **kw)
         self.make_gateway, self.executor_cls = make_gateway, executor_cls
-        self.gateway, self.root_token = None, None
+        self.gateway, self.root_token, self.user_query = None, None, ""
 
     def query(self, query, runtime, env=EmptyEnv(), messages=(), extra_args={}):
         self.gateway = self.make_gateway()  # fresh per task: taint/killed/step must not leak across tasks
-        # root role: orchestrator may (transitively) use every sub-agent tool of the suite
-        self.root_token = self.gateway.spawn(None, "orchestrator", sorted(runtime.functions), query)[1]
+        self.user_query = query
+        _, specs = _find_partition(set(runtime.functions), self.partitions)
+        # root role = agent-tool names + every suite tool (children are clamped into it)
+        tools = [s.name for s in specs] + sorted(runtime.functions)
+        self.root_token = self.gateway.spawn(None, "orchestrator", tools, query)[1]
         return super().query(query, runtime, env, messages, extra_args)
+
+    def _make_agent_elements(self, system_message, llm=None):
+        # only the orchestrator is built here (sub-agents are built in run_subagent): guard it too, so its
+        # delegations are logged/checked, sub-agent answers are ingested (taint), and a run-wide KILL
+        # raises AbortAgentError at the top level instead of being swallowed by FunctionsRuntime.
+        agent_llm = llm if llm is not None else self.llm
+        executor = self.executor_cls(self.gateway, self.root_token, self.user_query, self.tool_output_formatter)
+        loop = ToolsExecutionLoop([executor, agent_llm], max_iters=self.max_iters)
+        return [SystemMessage(system_message), InitQuery(), agent_llm, loop]
 
     def _make_subagent_tool(
         self, spec: SubAgentSpec, tools: Sequence[Function], records: list[tuple[str, list[ChatMessage]]]
@@ -115,7 +130,8 @@ class GuardedMultiAgentPipeline(MultiAgentPipeline):
 
         def run_subagent(task: str, env: TaskEnvironment) -> str:
             _, token, _ = self.gateway.spawn(self.root_token, spec.name, [t.name for t in tools], task)
-            executor = self.executor_cls(self.gateway, token, task, self.tool_output_formatter)
+            # taint/trust is judged against the USER query, never the (possibly laundered) delegated text
+            executor = self.executor_cls(self.gateway, token, self.user_query, self.tool_output_formatter)
             loop = ToolsExecutionLoop([executor, self.llm], max_iters=self.max_iters)
             elements = [SystemMessage(system_message), InitQuery(), self.llm, loop]
             _, _, _, sub_messages, _ = _run_elements(elements, task, FunctionsRuntime(tools), env, [], {})

@@ -1,7 +1,8 @@
 """raw_*.jsonl -> train/data/{train,val,test_ood,test_drift}.jsonl + stats.json.
 
-AgentDojo: pipelines in OOD are held out entirely (test_ood). Rest -> train/val by run hash.
-AgentDrift: task-disjoint train/val/test respected; test -> test_drift.
+AgentDojo: pipelines in OOD are held out entirely (test_ood = unseen agent model, SEEN tasks). Rest -> train/val by
+run hash. AgentDrift: task-disjoint train/val/test respected; test -> test_drift (the true held-out-task split).
+Dedupe on the user prompt (what the model sees): train has no duplicates; val/test drop any prompt that is in train.
 Line: {"messages": chat (system,user,assistant), "row": TrainRow, "cls", "source", "attack_type", "suite"}.
 """
 from __future__ import annotations
@@ -13,7 +14,7 @@ import random
 from collections import Counter, defaultdict
 
 from sg.schema import TrainRow
-from train.common import to_chat
+from train.common import to_chat, user_prompt
 
 OOD = ["claude-3-7-sonnet-20250219", "gemini-2.0-flash-001", "meta-llama_Llama-3.3-70B-Instruct", "Meta-SecAlign-70B"]
 
@@ -21,6 +22,22 @@ OOD = ["claude-3-7-sonnet-20250219", "gemini-2.0-flash-001", "meta-llama_Llama-3
 def load(path):
     with open(path) as f:
         return [json.loads(l) for l in f]
+
+
+def key(r):
+    if "_k" not in r:
+        row = TrainRow.model_validate(r["row"])
+        r["_k"] = hashlib.md5(user_prompt(row.task, row.role, row.window).encode()).hexdigest()
+    return r["_k"]
+
+
+def dedup(rows, seen: set):
+    out = []
+    for r in rows:
+        if key(r) not in seen:
+            seen.add(key(r))
+            out.append(r)
+    return out
 
 
 def pick(rows, n, seed=0):
@@ -65,15 +82,20 @@ def main():
     s = a.scale
     # (agentdojo, agentdrift) per class; max/min class = 2:1
     q_train = {"success": (int(2200 * s), int(1000 * s)), "failed": (int(1700 * s), int(600 * s)),
-               "injection": (0, int(1600 * s)), "benign": (int(2200 * s), int(1000 * s))}
+               "injection": (int(600 * s), int(1000 * s)), "benign": (int(2200 * s), int(1000 * s))}
     q_val = {c: (max(1, n // 12), max(1, m // 12)) for c, (n, m) in q_train.items()}
+    seen = set()
+    train = balanced(dedup([r for r in ind if not is_val(r)], seen), dedup(load(f"{a.dir}/raw_drift_train.jsonl"), seen), q_train)
+    tk = {key(r) for r in train}
+    cls4 = ("success", "failed", "injection", "benign")
     splits = {
-        "train": balanced([r for r in ind if not is_val(r)], load(f"{a.dir}/raw_drift_train.jsonl"), q_train),
-        "val": balanced([r for r in ind if is_val(r)], load(f"{a.dir}/raw_drift_val.jsonl"), q_val),
-        "test_ood": balanced(ood, [], {c: (a.test_cap, 0) for c in ("success", "failed", "benign")}),
-        "test_drift": balanced([], load(f"{a.dir}/raw_drift_test.jsonl"), {c: (0, a.test_cap) for c in ("success", "failed", "injection", "benign")}),
+        "train": train,
+        "val": balanced(dedup([r for r in ind if is_val(r)], set(tk)), dedup(load(f"{a.dir}/raw_drift_val.jsonl"), set(tk)), q_val),
+        "test_ood": balanced(dedup(ood, set(tk)), [], {c: (a.test_cap, 0) for c in cls4}),
+        "test_drift": balanced([], dedup(load(f"{a.dir}/raw_drift_test.jsonl"), set(tk)), {c: (0, a.test_cap) for c in cls4}),
     }
-    stats = {"ood_pipelines_held_out": OOD, "splits": {}}
+    stats = {"ood_pipelines_held_out": OOD, "notes": {"test_ood": "unseen agent model, seen tasks",
+             "test_drift": "held-out tasks (AgentDrift task-disjoint)"}, "splits": {}}
     for name, rows in splits.items():
         emit(rows, f"{a.dir}/{name}.jsonl")
         stats["splits"][name] = {

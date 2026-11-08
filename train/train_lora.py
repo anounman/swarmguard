@@ -8,25 +8,20 @@ Dry run: python train_lora.py --base Qwen/Qwen3-0.6B --rows data/train.jsonl --m
 from __future__ import annotations
 
 import argparse
-import json
 import os
 
 import torch
-from datasets import Dataset
+from datasets import load_dataset
 from peft import LoraConfig, PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from trl import SFTConfig, SFTTrainer
 
 
 def load_rows(path, limit=0):
-    out = []
-    with open(path) as f:
-        for i, line in enumerate(f):
-            if limit and i >= limit:
-                break
-            m = json.loads(line)["messages"]
-            out.append({"prompt": m[:-1], "completion": m[-1:]})
-    return Dataset.from_list(out)
+    ds = load_dataset("json", data_files=path, split="train")
+    if limit:
+        ds = ds.select(range(min(limit, len(ds))))
+    return ds.map(lambda r: {"prompt": r["messages"][:-1], "completion": r["messages"][-1:]}, remove_columns=ds.column_names)
 
 
 def main():
@@ -41,6 +36,7 @@ def main():
     ap.add_argument("--bs", type=int, default=4)
     ap.add_argument("--accum", type=int, default=4)
     ap.add_argument("--no-merge", action="store_true")
+    ap.add_argument("--resume", action="store_true", help="continue from the newest out/checkpoint-*")
     a = ap.parse_args()
     cuda = torch.cuda.is_available()
     tok = AutoTokenizer.from_pretrained(a.base)
@@ -61,7 +57,7 @@ def main():
         save_steps=300, save_total_limit=2, report_to="none", seed=42, use_cpu=not cuda,
     )
     tr = SFTTrainer(model=model, args=cfg, train_dataset=train, eval_dataset=val, processing_class=tok, peft_config=lora)
-    tr.train()
+    tr.train(resume_from_checkpoint=a.resume or None)
     adapter = os.path.join(a.out, "adapter")
     tr.model.save_pretrained(adapter)
     tok.save_pretrained(adapter)

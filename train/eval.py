@@ -42,7 +42,7 @@ def hf_fn(base, adapter):
     def f(msgs):
         ids = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt").to(m.device)
         with torch.no_grad():
-            out = m.generate(ids, max_new_tokens=160, do_sample=False)
+            out = m.generate(ids, max_new_tokens=256, do_sample=False)
         return tok.decode(out[0, ids.shape[1]:], skip_special_tokens=True)
 
     return f
@@ -54,6 +54,8 @@ def metrics(recs):
     y = [r["gold"] >= 8 for r in recs]
     s = [r["pred"] for r in recs]
     out = {"n": len(recs), "pos": sum(y), "json_fail_rate": sum(r["fail"] for r in recs) / max(1, len(recs))}
+    neg = [p for p, t in zip(s, y) if not t]
+    out["fpr@risk>=8"] = sum(p >= 8 for p in neg) / len(neg) if neg else None
     out["f1@risk>=8"] = f1_score(y, [p >= 8 for p in s]) if any(y) else None
     out["pr_auc"] = average_precision_score(y, s) if any(y) and not all(y) else None
     if any(y) and not all(y):

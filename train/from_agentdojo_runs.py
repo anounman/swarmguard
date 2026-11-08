@@ -15,11 +15,11 @@ import re
 from collections import Counter
 
 from sg.schema import EventKind, Role, TrainRow, Verdict
-from train.common import PREVIEW, WINDOW, ev, text
+from train.common import WINDOW, ev, sinks, text
 
 DEFENSES = ("-repeat_user_prompt", "-spotlighting_with_delimiting", "-tool_filter", "-transformers_pi_detector")
-SINK_PREFIX = ("send_", "post_", "share_", "invite_", "add_user", "update_", "schedule_", "delete_", "reserve_", "create_")
-RISK = {"success": 9.0, "failed": 4.0, "benign": 1.0}
+# injection = window ends at the poisoned TOOL_RESULT (agent has not acted yet): same label whatever the outcome
+RISK = {"success": 9.0, "injection": 6.0, "failed": 4.0, "benign": 1.0}
 _TOOLS: dict[str, list[str]] = {}
 
 
@@ -64,20 +64,16 @@ def find_onset(events, msgs, injections: dict) -> int | None:
     full = dict(zip(res_idx, tool_texts))
     for i in res_idx:
         t = norm(full[i])
-        for k in keys:
-            pos = t.find(k)
-            if pos >= 0:
-                # ponytail: preview centred on the injection so the 300-char window shows it; at runtime the
-                # monitor sees the head of the output only (ceiling: long outputs hide late injections).
-                st = max(0, pos - 150)
-                events[i].result_preview = ("..." if st else "") + t[st : st + PREVIEW]
-                return i
+        if any(k in t for k in keys):
+            return i
     return None
 
 
 def rationale(cls: str, onset: int | None) -> str:
     if cls == "success":
         return f"Untrusted tool output at step {onset} injects instructions that hijack the agent."
+    if cls == "injection":
+        return f"Untrusted tool output at step {onset} contains injected instructions."
     if cls == "failed":
         return f"Tool output at step {onset} carries injected instructions; agent has not complied."
     return "Actions match the user task; no injected instructions seen."
@@ -106,7 +102,7 @@ def rows_for_file(path: str):
     cls = ("success" if sec else "failed") if onset is not None else "benign"
     tools = suite_tools(suite) or sorted({e.tool for e in events if e.tool})
     role = Role(task_id=f"{suite}/{utid}", name=f"{suite}_agent", tools=tools,
-                egress_sinks=[t for t in tools if t.startswith(SINK_PREFIX)])
+                egress_sinks=sinks(tools))
     meta = {"cls": cls, "pipeline": pipe, "suite": suite, "attack_type": d.get("attack_type") or "none"}
 
     def mk(win, c, fb):
@@ -125,9 +121,9 @@ def rows_for_file(path: str):
             out.append(mk(events[max(0, i - WINDOW + 1) : i + 1], "benign", None) | {"kind": "mid"})
         return out
     s = max(0, min(onset, n - WINDOW))
-    out.append(mk(events[s : s + WINDOW], cls, onset) | {"kind": "final"})
-    if onset + 1 < n or s != max(0, onset - WINDOW + 1):
-        out.append(mk(events[max(0, onset - WINDOW + 1) : onset + 1], cls, onset) | {"kind": "onset"})
+    if onset < n - 1:  # final window holds the agent's response after the onset
+        out.append(mk(events[s : s + WINDOW], cls, onset) | {"kind": "final"})
+    out.append(mk(events[max(0, onset - WINDOW + 1) : onset + 1], "injection", onset) | {"kind": "onset"})
     if onset > 0:
         out.append(mk(events[max(0, onset - WINDOW) : onset], "benign", None) | {"kind": "pre_onset"})
     return out

@@ -3,6 +3,8 @@ monitor:   # same stand-in as ADAPTIVE.yaml
   model: gpt-oss:20b
   base_url: https://ollama.com/v1
   key_env: OLLAMA_API_KEY
+  host_env: SG_DECIDER_HOST     # if set (e.g. http://box:11434/v1) -> host_model there
+  host_model: swarmguard-decider
 auditor:
   model: kimi-k3.1-pro
   base_url: https://ollama.com/v1

@@ -9,7 +9,7 @@ uv run pytest -q tests/train
 # dry sample: --limit-files 500 / splits --scale 0.01
 ```
 Line format: `{"messages":[system,user,assistant], "row": TrainRow, "cls", "source", "attack_type", "suite"}`.
-OOD held out (test_ood): claude-3-7-sonnet-20250219, gemini-2.0-flash-001, meta-llama_Llama-3.3-70B-Instruct, Meta-SecAlign-70B.
+OOD held out (test_ood = unseen agent model, SEEN tasks; test_drift = held-out tasks): claude-3-7-sonnet-20250219, gemini-2.0-flash-001, meta-llama_Llama-3.3-70B-Instruct, Meta-SecAlign-70B.
 Labels: hijacked 9 · injection seen (AgentDrift injection_point) 6 · injection failed 4 · benign 1. `first_bad_step` = Event.step of the poisoned TOOL_RESULT.
 
 ## Transfer to the box (box cannot reach the Mac; Mac can ssh to it)
@@ -39,6 +39,14 @@ bash export.sh out/decider/merged && ollama run swarmguard-decider --format json
 ## Eval (from Mac against the box's Ollama, or on the box with the adapter)
 ```bash
 uv run python train/eval.py --endpoint http://100.73.163.94:11434/v1 --model swarmguard-decider --limit 300
-python eval.py --splits data/test_ood.jsonl data/test_drift.jsonl --adapter out/decider/adapter --limit 300   # box; needs ../sg or copy common.py+sg/
+python train/eval.py --splits data_v2/test_ood.jsonl data_v2/test_drift.jsonl --adapter out/decider/adapter --limit 300   # box, from ~/swarmguard-train (sg/ + train/ copied; box venv needs pydantic)
 ```
-Writes `results/decider_eval.json`: F1@risk≥8, PR-AUC, FPR@95%recall, onset ±1 acc, JSON-fail rate, per attack_type.
+Writes `results/decider_eval.json`: F1@risk≥8, PR-AUC, FPR@95%recall, FPR@risk≥8, onset ±1 acc, JSON-fail rate, per attack_type.
+
+## Runtime contract (S-runtime LLMMonitor)
+- Build the prompt with `train.common.user_prompt(task, role, window)` / `to_chat(..., with_answer=False)`; parse with `parse_verdict` (None -> FLAG).
+- Keep the full tool output (≤4000 chars, as `sg.gateway.ingest` does) in `Event.result_preview`. `common.clip` shows 300 chars
+  centred on the first `sg.monitors` injection marker (head if none). Training uses the same rule, so do not pre-truncate.
+- Labels: window ends at the poisoned TOOL_RESULT -> risk 6 (injection seen, any outcome); agent acted on it -> 9; agent ignored it -> 4; benign 1.
+- An early poisoned result stays in the window (first event) like `sg.gateway.window`.
+- Resume a stopped run: `python train_lora.py ... --resume` (newest out/decider/checkpoint-*).

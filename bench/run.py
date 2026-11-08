@@ -65,7 +65,7 @@ def run_suite(a) -> int:
             attack = load_attack(a.attack, suite, pipe)  # after pipe.name is set
             for ut in uts:
                 u, s = run_task_with_injection_tasks(suite, pipe, suite.get_user_task_by_id(ut), attack, logdir,
-                                                     a.force, None, VERSION)
+                                                     a.force, a.inj, VERSION)
                 rows += list(zip(u.values(), s.values()))
     tok = pipe.llm_counter.total
     pi, po = PRICES.get(a.model, (None, None))
@@ -91,6 +91,7 @@ def main(argv=None) -> int:
     p.add_argument("--suite", default="all", choices=SUITES + ["all"])
     p.add_argument("--attack", default="important_instructions", choices=["important_instructions", "none"])
     p.add_argument("--n", type=int, default=None, help="limit user tasks (smoke)")
+    p.add_argument("--inj", action="append", default=None, help="limit injection task ids (smoke), repeatable")
     p.add_argument("--key", default="A", choices=["A", "B"])
     p.add_argument("--logdir", default=None)
     p.add_argument("--name", default=None, help="override pipeline name (e.g. openai-compatible-multi-agent "

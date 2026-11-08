@@ -13,7 +13,7 @@ import os
 from collections import Counter
 
 from sg.schema import EventKind, Role, TrainRow, Verdict
-from train.common import WINDOW, ev
+from train.common import WINDOW, ev, sinks
 
 RISK = {"benign": 1.0, "failed_injection": 4.0, "injection_point": 6.0, "hijacked": 9.0}
 CLS = {"benign": "benign", "failed_injection": "failed", "injection_point": "injection", "hijacked": "success"}
@@ -64,7 +64,7 @@ def rows_for(d: dict):
         events.append(ev(run_id, len(events), EventKind.TOOL_CALL, tool=st.get("tool"), args=st.get("args") if isinstance(st.get("args"), dict) else {"value": st.get("args")}))
         events.append(ev(run_id, len(events), EventKind.TOOL_RESULT, tool=st.get("tool"), preview=str(st.get("obs", "")), trusted=False))
     tools = tool_list(d["agent"]) or sorted({st.get("tool") for st in a["steps"] if st.get("tool")})
-    role = Role(task_id=run_id, name=f"{d['agent']}_agent", tools=tools)
+    role = Role(task_id=run_id, name=f"{d['agent']}_agent", tools=tools, egress_sinks=sinks(tools))
     inj = None
     out = []
     for k, st in enumerate(a["steps"]):
@@ -74,10 +74,15 @@ def rows_for(d: dict):
         end = 2 * k + (1 if lab in ("injection_point", "failed_injection") else 0)
         if lab in ("injection_point", "failed_injection") and inj is None:
             inj = 2 * k + 1
-        fb = None if lab == "benign" else (inj if inj is not None else end)
+        if lab == "hijacked" and inj is None:
+            continue  # no poisoned TOOL_RESULT before it: first_bad_step would not be a TOOL_RESULT
+        fb = None if lab == "benign" else inj
+        win = events[max(0, end - WINDOW + 1) : end + 1]
+        if fb is not None and fb < win[0].step:  # keep the earlier poisoned result in view, like sg.gateway.window
+            win = [events[fb]] + win[-(WINDOW - 1):]
         v = Verdict(risk=RISK[lab], category="benign" if lab == "benign" else "prompt_injection",
                     first_bad_step=fb, rationale=WHY[lab].format(s=fb))
-        row = TrainRow(task=a["task"], role=role, window=events[max(0, end - WINDOW + 1) : end + 1], output=v, source="agentdrift")
+        row = TrainRow(task=a["task"], role=role, window=win, output=v, source="agentdrift")
         out.append({"row": row.model_dump(mode="json"), "cls": CLS[lab], "pipeline": "agentdrift",
                     "suite": d["agent"], "attack_type": d.get("attack_type") or "none", "kind": lab, "dcat": d.get("category")})
     return out
