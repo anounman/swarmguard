@@ -1,0 +1,29 @@
+{
+ "license": "CC BY 4.0",
+ "repo": "nvidia/Nemotron-RL-Agentic-Indirect-Prompt-Injection-v1",
+ "scenarios": 1272,
+ "skipped": 1,
+ "rows": 3726,
+ "cls": {
+  "hijack": 1271,
+  "benign": 1271,
+  "resisted": 1184
+ },
+ "domain": {
+  "healthcare": 544,
+  "ecommerce": 453,
+  "legal": 521,
+  "insurance": 193,
+  "education": 438,
+  "real_estate": 464,
+  "logistics": 465,
+  "it_helpdesk": 258,
+  "hr": 390
+ },
+ "category": {
+  "exfiltration": 230,
+  "benign": 1271,
+  "prompt_injection": 1680,
+  "unauthorized_action": 545
+ }
+}

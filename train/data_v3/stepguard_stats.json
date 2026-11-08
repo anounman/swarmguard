@@ -1,0 +1,43 @@
+{
+ "dataset": "ninty-seven/stepguard_data",
+ "license": "apache-2.0",
+ "examples": 7000,
+ "dup": 223,
+ "rows": 3686,
+ "cls": {
+  "benign": 2248,
+  "resisted": 830,
+  "hijack": 608
+ },
+ "category": {
+  "benign": 2248,
+  "prompt_injection": 1306,
+  "unauthorized_action": 109,
+  "exfiltration": 23
+ },
+ "level": {
+  "action": 1927,
+  "traj": 1759
+ },
+ "kept_source": {
+  "none": 892,
+  "indirect_prompt_injection": 721,
+  "corrupted_tool_feedback": 717,
+  "unreliable_or_misinformation": 422,
+  "direct_prompt_injection": 398,
+  "inherent_agent_failure": 192,
+  "malicious_tool_execution": 180,
+  "malicious_user_instruction_or_jailbreak": 164
+ },
+ "dropped": {
+  "unsafe:malicious_user_instruction_or_jailbreak": 646,
+  "tool_description_injection": 508,
+  "unsafe:malicious_tool_execution": 486,
+  "unsafe_step_unmapped": 375,
+  "unsafe:inherent_agent_failure": 372,
+  "unsafe:unreliable_or_misinformation": 346,
+  "unsafe:direct_prompt_injection": 329,
+  "no_untrusted_result": 23,
+  "no_events": 6
+ }
+}

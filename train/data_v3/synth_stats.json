@@ -1,0 +1,39 @@
+{
+ "requested": 500,
+ "returned": 496,
+ "missing": 4,
+ "accepted_hijack": 200,
+ "reject_value": 15,
+ "reject_shape": 4,
+ "accepted_benign": 200,
+ "reject_marker": 3,
+ "rows": 600,
+ "rows_by_kind": {
+  "synth_hijack": 200,
+  "synth_twin": 200,
+  "synth_benign": 200
+ },
+ "rows_by_suite": {
+  "slack": 56,
+  "travel": 216,
+  "banking": 143,
+  "workspace": 185
+ },
+ "attack_types": {
+  "synth_authority": 34,
+  "synth_laundering": 35,
+  "synth_poisoning": 32,
+  "synth_urgency": 33,
+  "synth_embedded": 35,
+  "synth_paraphrase": 31
+ },
+ "categories": {
+  "privilege_escalation": 13,
+  "benign": 400,
+  "laundering": 35,
+  "poisoning": 32,
+  "unauthorized_action": 82,
+  "exfiltration": 38
+ },
+ "rejection_rate": 0.044
+}

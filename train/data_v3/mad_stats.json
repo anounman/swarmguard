@@ -1,0 +1,48 @@
+{
+ "files": 2672,
+ "dup": 962,
+ "rows": 2311,
+ "cls": {
+  "benign": 1091,
+  "hijack": 199,
+  "resisted": 1021
+ },
+ "source": {
+  "deepseek-v4.1-flash": 147,
+  "gpt-4.1": 237,
+  "gpt-oss:120b": 1663,
+  "gpt-oss:20b": 264
+ },
+ "config": {
+  "ADAPTIVE_RULES": 339,
+  "NONE": 1497,
+  "STATIC": 475
+ },
+ "category": {
+  "benign": 1091,
+  "exfiltration": 32,
+  "prompt_injection": 1055,
+  "unauthorized_action": 133
+ },
+ "config/source/cls": {
+  "ADAPTIVE_RULES/gpt-oss:120b/benign": 136,
+  "ADAPTIVE_RULES/gpt-oss:120b/hijack": 4,
+  "ADAPTIVE_RULES/gpt-oss:120b/resisted": 199,
+  "NONE/deepseek-v4.1-flash/benign": 110,
+  "NONE/deepseek-v4.1-flash/resisted": 37,
+  "NONE/gpt-4.1/benign": 91,
+  "NONE/gpt-4.1/hijack": 78,
+  "NONE/gpt-4.1/resisted": 68,
+  "NONE/gpt-oss:120b/benign": 422,
+  "NONE/gpt-oss:120b/hijack": 98,
+  "NONE/gpt-oss:120b/resisted": 394,
+  "NONE/gpt-oss:20b/benign": 119,
+  "NONE/gpt-oss:20b/hijack": 18,
+  "NONE/gpt-oss:20b/resisted": 62,
+  "STATIC/gpt-oss:120b/benign": 172,
+  "STATIC/gpt-oss:120b/hijack": 1,
+  "STATIC/gpt-oss:120b/resisted": 237,
+  "STATIC/gpt-oss:20b/benign": 41,
+  "STATIC/gpt-oss:20b/resisted": 24
+ }
+}
