@@ -1,60 +1,65 @@
 {
-  "generated": "2026-11-08 07:22:01 CET",
+  "generated": "2026-11-08 07:26:31 CET",
   "bench": "mad",
   "runs": {
     "ADAPTIVE_RULES": {
       "gpt-oss:120b": {
-        "utility_no_attack": 64.6,
+        "utility_no_attack": 63.9,
         "utility_no_attack_ci": [
-          55.0,
-          74.2
+          54.4,
+          73.5
         ],
-        "utility_under_attack": 57.0,
+        "utility_under_attack": 56.7,
         "asr": 1.3,
         "asr_ci": [
           0.5,
-          3.4
+          3.2
         ],
-        "n_user_tasks": 96,
-        "n_injected": 298,
+        "n_user_tasks": 97,
+        "n_injected": 314,
         "n_successful_attacks": 4,
         "errors": 0,
-        "invalid_logs": 4,
+        "invalid_logs": 3,
         "suites": [
           "banking",
           "slack",
           "travel",
           "workspace"
         ],
-        "n_events": 6130,
-        "denied_calls_benign_rate": null,
-        "denied_calls": 163,
-        "attenuations": 69,
-        "kills": 48,
-        "p50_latency_ms": 0.46,
-        "p95_latency_ms": 1.81,
-        "est_usd": 0.2628,
-        "utility_delta_vs_none": 8.4,
-        "asr_drop_vs_none": 12.8,
+        "n_events": 6580,
+        "denied_calls_benign_rate": 0.1,
+        "denied_calls_attack_rate": 4.5,
+        "killed_runs": 43,
+        "denied_calls": 179,
+        "attenuations": 83,
+        "kills": 49,
+        "latency_p50_ms": 0.48,
+        "latency_p95_ms": 1.93,
+        "n_checks": 2442,
+        "p50_latency_ms": 0.48,
+        "p95_latency_ms": 1.93,
+        "est_usd": 0.3767,
+        "utility_delta_vs_none": 7.7,
+        "asr_drop_vs_none": 12.7,
         "utility_gain_vs_rules": 0.0,
-        "utility_retention": 114.9
+        "utility_retention": 113.7
       }
     },
     "NONE": {
       "deepseek-v4.1-flash": {
-        "utility_no_attack": 85.7,
+        "utility_no_attack": 90.9,
         "utility_no_attack_ci": [
-          59.8,
+          73.9,
           100.0
         ],
-        "utility_under_attack": 42.9,
+        "utility_under_attack": 59.1,
         "asr": 0.0,
         "asr_ci": [
           0.0,
-          21.5
+          14.9
         ],
-        "n_user_tasks": 7,
-        "n_injected": 14,
+        "n_user_tasks": 11,
+        "n_injected": 22,
         "n_successful_attacks": 0,
         "errors": 0,
         "invalid_logs": 2,
@@ -63,10 +68,15 @@
           "workspace"
         ],
         "n_events": 0,
-        "denied_calls_benign_rate": null,
+        "denied_calls_benign_rate": 0.0,
+        "denied_calls_attack_rate": 0.0,
+        "killed_runs": 0,
         "denied_calls": 0,
         "attenuations": 0,
         "kills": 0,
+        "latency_p50_ms": null,
+        "latency_p95_ms": null,
+        "n_checks": 0,
         "p50_latency_ms": null,
         "p95_latency_ms": null,
         "est_usd": 1.5616,
@@ -97,10 +107,15 @@
           "workspace"
         ],
         "n_events": 0,
-        "denied_calls_benign_rate": null,
+        "denied_calls_benign_rate": 0.0,
+        "denied_calls_attack_rate": 0.0,
+        "killed_runs": 0,
         "denied_calls": 0,
         "attenuations": 0,
         "kills": 0,
+        "latency_p50_ms": null,
+        "latency_p95_ms": null,
+        "n_checks": 0,
         "p50_latency_ms": null,
         "p95_latency_ms": null,
         "est_usd": null,
@@ -115,14 +130,14 @@
           31.9,
           80.6
         ],
-        "utility_under_attack": 64.9,
-        "asr": 14.1,
+        "utility_under_attack": 64.3,
+        "asr": 14.0,
         "asr_ci": [
-          11.7,
-          17.0
+          11.6,
+          16.8
         ],
         "n_user_tasks": 16,
-        "n_injected": 679,
+        "n_injected": 687,
         "n_successful_attacks": 96,
         "errors": 0,
         "invalid_logs": 3,
@@ -133,10 +148,15 @@
           "workspace"
         ],
         "n_events": 0,
-        "denied_calls_benign_rate": null,
+        "denied_calls_benign_rate": 0.0,
+        "denied_calls_attack_rate": 0.0,
+        "killed_runs": 0,
         "denied_calls": 0,
         "attenuations": 0,
         "kills": 0,
+        "latency_p50_ms": null,
+        "latency_p95_ms": null,
+        "n_checks": 0,
         "p50_latency_ms": null,
         "p95_latency_ms": null,
         "est_usd": 0.2888,
@@ -146,20 +166,20 @@
         "utility_retention": 100.0
       },
       "gpt-oss:20b": {
-        "utility_no_attack": 52.4,
+        "utility_no_attack": 50.6,
         "utility_no_attack_ci": [
-          41.6,
-          63.2
+          40.1,
+          61.1
         ],
-        "utility_under_attack": 47.4,
-        "asr": 10.2,
+        "utility_under_attack": 44.7,
+        "asr": 11.3,
         "asr_ci": [
-          6.2,
-          16.4
+          7.2,
+          17.4
         ],
-        "n_user_tasks": 82,
-        "n_injected": 137,
-        "n_successful_attacks": 14,
+        "n_user_tasks": 87,
+        "n_injected": 150,
+        "n_successful_attacks": 17,
         "errors": 0,
         "invalid_logs": 6,
         "suites": [
@@ -169,13 +189,18 @@
           "workspace"
         ],
         "n_events": 0,
-        "denied_calls_benign_rate": null,
+        "denied_calls_benign_rate": 0.0,
+        "denied_calls_attack_rate": 0.0,
+        "killed_runs": 0,
         "denied_calls": 0,
         "attenuations": 0,
         "kills": 0,
+        "latency_p50_ms": null,
+        "latency_p95_ms": null,
+        "n_checks": 0,
         "p50_latency_ms": null,
         "p95_latency_ms": null,
-        "est_usd": 0.193,
+        "est_usd": 0.2145,
         "utility_delta_vs_none": 0.0,
         "asr_drop_vs_none": 0.0,
         "utility_gain_vs_rules": null,
@@ -189,14 +214,14 @@
           54.4,
           73.5
         ],
-        "utility_under_attack": 64.8,
+        "utility_under_attack": 63.9,
         "asr": 0.7,
         "asr_ci": [
           0.2,
-          2.7
+          2.5
         ],
         "n_user_tasks": 97,
-        "n_injected": 270,
+        "n_injected": 291,
         "n_successful_attacks": 2,
         "errors": 0,
         "invalid_logs": 4,
@@ -206,64 +231,81 @@
           "travel",
           "workspace"
         ],
-        "n_events": 5885,
-        "denied_calls_benign_rate": null,
-        "denied_calls": 215,
+        "n_events": 6226,
+        "denied_calls_benign_rate": 0.4,
+        "denied_calls_attack_rate": 14.6,
+        "killed_runs": 0,
+        "denied_calls": 263,
         "attenuations": 0,
         "kills": 0,
-        "p50_latency_ms": 0.41,
-        "p95_latency_ms": 1.34,
+        "latency_p50_ms": 0.43,
+        "latency_p95_ms": 1.42,
+        "n_checks": 2534,
+        "p50_latency_ms": 0.43,
+        "p95_latency_ms": 1.42,
         "est_usd": 0.1992,
         "utility_delta_vs_none": 7.7,
-        "asr_drop_vs_none": 13.4,
-        "utility_gain_vs_rules": -0.7,
+        "asr_drop_vs_none": 13.3,
+        "utility_gain_vs_rules": 0.0,
         "utility_retention": 113.7
       },
       "gpt-oss:20b": {
-        "utility_no_attack": 71.4,
+        "utility_no_attack": 73.3,
         "utility_no_attack_ci": [
-          38.0,
-          100.0
+          51.0,
+          95.7
         ],
-        "utility_under_attack": 83.3,
+        "utility_under_attack": 70.0,
         "asr": 0.0,
         "asr_ci": [
           0.0,
-          24.2
+          11.4
         ],
-        "n_user_tasks": 7,
-        "n_injected": 12,
+        "n_user_tasks": 15,
+        "n_injected": 30,
         "n_successful_attacks": 0,
         "errors": 0,
-        "invalid_logs": 2,
+        "invalid_logs": 3,
         "suites": [
+          "banking",
           "workspace"
         ],
-        "n_events": 180,
-        "denied_calls_benign_rate": null,
-        "denied_calls": 1,
+        "n_events": 392,
+        "denied_calls_benign_rate": 0.0,
+        "denied_calls_attack_rate": 4.7,
+        "killed_runs": 0,
+        "denied_calls": 4,
         "attenuations": 0,
         "kills": 0,
-        "p50_latency_ms": 0.83,
-        "p95_latency_ms": 2.24,
-        "est_usd": 0.3759,
+        "latency_p50_ms": 0.74,
+        "latency_p95_ms": 1.79,
+        "n_checks": 144,
+        "p50_latency_ms": 0.74,
+        "p95_latency_ms": 1.79,
+        "est_usd": 0.4652,
         "utility_delta_vs_none": null,
-        "asr_drop_vs_none": 10.2,
+        "asr_drop_vs_none": 11.3,
         "utility_gain_vs_rules": null,
         "utility_retention": null
       }
     }
   },
   "spend": {
-    "total_usd": 2.8837,
+    "total_usd": 3.1084,
     "by_provider": {
       "commandcode": 1.5616,
-      "ollama": 1.3221
+      "ollama": 1.5468,
+      "openrouter": 0.0
     },
     "by_ollama_key": {
-      "?": 0.49,
-      "A": 0.3893,
-      "B": 0.4428
+      "A": 0.4108,
+      "B": 0.646,
+      "unknown": 0.49
+    },
+    "by_model": {
+      "deepseek-v4.1-flash": 1.5616,
+      "gpt-oss:120b": 0.8647,
+      "gpt-oss:20b": 0.682
     }
   },
   "decider": {},
