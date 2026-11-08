@@ -1,0 +1,17 @@
+# ADAPTIVE (trained decider via SG_DECIDER_HOST) — launch only after `ollama create swarmguard-decider` on the box and SG_DECIDER_HOST exported.
+ADAPTIVE gpt-oss:120b workspace important_instructions A
+ADAPTIVE gpt-oss:120b workspace none A
+ADAPTIVE gpt-oss:120b banking important_instructions A
+ADAPTIVE gpt-oss:120b banking none A
+ADAPTIVE gpt-oss:120b slack important_instructions B
+ADAPTIVE gpt-oss:120b slack none B
+ADAPTIVE gpt-oss:120b travel important_instructions B
+ADAPTIVE gpt-oss:120b travel none B
+ADAPTIVE gpt-oss:20b workspace important_instructions B
+ADAPTIVE gpt-oss:20b workspace none B
+ADAPTIVE gpt-oss:20b banking important_instructions B
+ADAPTIVE gpt-oss:20b banking none B
+ADAPTIVE gpt-oss:20b slack important_instructions A
+ADAPTIVE gpt-oss:20b slack none A
+ADAPTIVE gpt-oss:20b travel important_instructions A
+ADAPTIVE gpt-oss:20b travel none A

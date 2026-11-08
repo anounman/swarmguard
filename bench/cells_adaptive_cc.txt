@@ -1,0 +1,8 @@
+ADAPTIVE deepseek/deepseek-v4.1-flash workspace important_instructions A
+ADAPTIVE deepseek/deepseek-v4.1-flash workspace none A
+ADAPTIVE deepseek/deepseek-v4.1-flash banking important_instructions A
+ADAPTIVE deepseek/deepseek-v4.1-flash banking none A
+ADAPTIVE deepseek/deepseek-v4.1-flash slack important_instructions A
+ADAPTIVE deepseek/deepseek-v4.1-flash slack none A
+ADAPTIVE deepseek/deepseek-v4.1-flash travel important_instructions A
+ADAPTIVE deepseek/deepseek-v4.1-flash travel none A
