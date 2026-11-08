@@ -3,7 +3,7 @@ providers:
   ollama:
     base_url: https://ollama.com/v1
     cap_usd_total: 58          # ~$58 across both keys (user, 06:20 CET Nov 8)
-    reserve_usd: 8             # never spend below this remaining
+    reserve_usd: 4             # C31 (20:40 CET): 8 -> 4; the final day needs no Ollama runs, the remainder funds the red-team rounds (user priority)
     max_concurrent_per_key: 3  # pay-as-you-go limit → 2 suites per key
     keys:
       A: OLLAMA_API_KEY        # env

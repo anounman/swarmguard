@@ -101,6 +101,8 @@ def run_suite(a, bud: dict) -> int:
                     rows.append(run_task_without_injection_tasks(suite, pipe, suite.get_user_task_by_id(ut), logdir,
                                                                  a.force, VERSION))
             else:
+                if a.attack == "redteam":
+                    import bench.redteam.attack  # noqa: F401  registers 'redteam' (texts from env SG_REDTEAM_FILE)
                 attack = load_attack(a.attack, suite, pipe)  # after pipe.name is set
                 for ut, its in by_ut:  # explicit injection list honours --inj and --max-episodes
                     u, s = run_task_with_injection_tasks(suite, pipe, suite.get_user_task_by_id(ut), attack, logdir,
@@ -122,7 +124,7 @@ def main(argv=None) -> int:
     p.add_argument("--config", required=True, choices=CONFIGS)
     p.add_argument("--model", required=True, choices=MODELS)
     p.add_argument("--suite", default="all", choices=SUITES + ["all"])
-    p.add_argument("--attack", default="important_instructions", choices=["important_instructions", "none"])
+    p.add_argument("--attack", default="important_instructions", choices=["important_instructions", "redteam", "none"])
     p.add_argument("--n", type=int, default=None, help="limit user tasks (smoke)")
     p.add_argument("--inj", action="append", default=None, help="limit injection task ids (smoke), repeatable")
     p.add_argument("--max-episodes", type=int, default=None, help="stop after N episodes per suite (ASR sample)")
