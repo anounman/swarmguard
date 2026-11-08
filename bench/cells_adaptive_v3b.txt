@@ -1,0 +1,18 @@
+# v3b (C26) = decider v3 + conservative risk_map (ADAPTIVE_v3b.yaml). The first v3 run (KILL at raw 4.5) is kept as runs/mad/ADAPTIVE_v3 (n=150, aggressive-map data point).
+# ADAPTIVE(v3b) = config ADAPTIVE + env SG_MONITOR_CFG=bench/configs/ADAPTIVE_v3b.yaml + own logdir (C23), so it never shares
+# a logdir with the running ADAPTIVE(v2) cells. Launch: SG_DECIDER_HOST=http://192.168.0.146:11434/v1 SG_MONITOR_CFG=bench/configs/ADAPTIVE_v3b.yaml
+#   SG_DONE_DIR=runs/mad/.done_v3b uv run python bench/supervise.py bench/cells_adaptive_v3.txt --max-live 8   (sandbox off: LAN)
+# alive() matches v2 cells of the same model/suite/attack -> a v3 cell starts only after the v2 cell finished (serialises load).
+ADAPTIVE gpt-oss:120b workspace important_instructions A --logdir runs/mad/ADAPTIVE_v3b/gpt-oss:120b
+ADAPTIVE gpt-oss:120b workspace none A --logdir runs/mad/ADAPTIVE_v3b/gpt-oss:120b
+ADAPTIVE gpt-oss:120b banking important_instructions A --logdir runs/mad/ADAPTIVE_v3b/gpt-oss:120b
+ADAPTIVE gpt-oss:120b banking none A --logdir runs/mad/ADAPTIVE_v3b/gpt-oss:120b
+ADAPTIVE gpt-oss:120b slack important_instructions B --logdir runs/mad/ADAPTIVE_v3b/gpt-oss:120b
+ADAPTIVE gpt-oss:120b slack none B --logdir runs/mad/ADAPTIVE_v3b/gpt-oss:120b
+ADAPTIVE gpt-oss:120b travel important_instructions B --logdir runs/mad/ADAPTIVE_v3b/gpt-oss:120b
+ADAPTIVE gpt-oss:120b travel none B --logdir runs/mad/ADAPTIVE_v3b/gpt-oss:120b
+# second wave (uncomment when 120b v3 cells are done and the budget gate allows):
+# ADAPTIVE gpt-oss:20b workspace important_instructions B --logdir runs/mad/ADAPTIVE_v3b/gpt-oss:20b
+# ADAPTIVE gpt-oss:20b banking important_instructions B --logdir runs/mad/ADAPTIVE_v3b/gpt-oss:20b
+# ADAPTIVE deepseek/deepseek-v4.1-flash banking important_instructions - --logdir runs/mad/ADAPTIVE_v3b/deepseek-v4.1-flash
+# ADAPTIVE deepseek/deepseek-v4.1-flash banking none - --logdir runs/mad/ADAPTIVE_v3b/deepseek-v4.1-flash
