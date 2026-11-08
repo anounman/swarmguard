@@ -11,3 +11,8 @@ models/
 .DS_Store
 loop/iter_*/
 bench/mad/runs/
+
+# derived training data / eval outputs (regenerable; public datasets contain fake-looking keys that trip push protection)
+train/data/
+train/data_v3/*.jsonl
+train/data_v3/*_spend.json
