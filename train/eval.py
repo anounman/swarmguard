@@ -23,7 +23,9 @@ def endpoint_fn(url, model, key):
     cli = OpenAI(base_url=url, api_key=key or "ollama")
 
     def f(msgs):
-        r = cli.chat.completions.create(model=model, messages=msgs, temperature=0, max_tokens=1024,  # reasoning baselines (gpt-oss) spend tokens before JSON
+        # Claude 5.5 via Anthropic's OpenAI-compat endpoint rejects `temperature` -> omit it for claude judges (C30)
+        temp = {} if "claude" in model.lower() else {"temperature": 0}
+        r = cli.chat.completions.create(model=model, messages=msgs, **temp, max_tokens=1024,  # reasoning baselines (gpt-oss) spend tokens before JSON
                                         response_format={"type": "json_object"})
         return r.choices[0].message.content or ""
 
