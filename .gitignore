@@ -16,3 +16,4 @@ bench/mad/runs/
 train/data/
 train/data_v3/*.jsonl
 train/data_v3/*_spend.json
+docs/build/
