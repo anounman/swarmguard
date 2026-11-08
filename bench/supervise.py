@@ -27,7 +27,7 @@ def marker(c) -> Path:
     return DONE / ("_".join(c[:4]).replace("/", "-").replace(":", "-") + ".done")
 
 def launch(c):
-    log = Path(f"runs/mad/{c[0]}/{c[1]}"); log.mkdir(parents=True, exist_ok=True)
+    log = Path(f"runs/mad/{c[0]}/{c[1].rsplit('/', 1)[-1]}"); log.mkdir(parents=True, exist_ok=True)
     cmd = (f"uv run python bench/run.py --bench mad --config {c[0]} --model {c[1]} --suite {c[2]} --attack {c[3]} --key {c[4]} "
            f">> {log}/{c[2]}-{c[3]}.log 2>&1 && touch {marker(c)}")
     subprocess.Popen(["sh", "-c", cmd], env=key_env(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)

@@ -36,13 +36,15 @@ def test_real_budget_yaml_resolves():
     assert P.resolve("openai/gpt-4.1")["base_url"].startswith("https://openrouter.ai")
 
 
-def test_key_loader_env_then_zshrc(tmp_path, monkeypatch):
-    (tmp_path / ".zshrc").write_text('export FAKE_K="old"\nexport FAKE_K="fromrc"\n')
+def test_key_loader_zshrc_first_then_env(tmp_path, monkeypatch):
+    (tmp_path / ".zshrc").write_text('export FAKE_K="old"\nexport FAKE_K="fromrc"\nexport ONLY_ENV_K=""\n')
     monkeypatch.setenv("FAKE_K", "")
-    assert P.env_key("FAKE_K", home=tmp_path) == "fromrc"  # empty env -> rc, last line wins
+    assert P.env_key("FAKE_K", home=tmp_path) == "fromrc"  # rc, last line wins
     monkeypatch.setenv("HOME", str(tmp_path))
     assert P.env_key("FAKE_K") == "fromrc"
-    monkeypatch.setenv("FAKE_K", "fromenv")
-    assert P.env_key("FAKE_K", home=tmp_path) == "fromenv"
+    monkeypatch.setenv("FAKE_K", "stale-env")
+    assert P.env_key("FAKE_K", home=tmp_path) == "fromrc"  # rc beats a (possibly stale) env copy
+    monkeypatch.setenv("ONLY_ENV_K", "fromenv")
+    assert P.env_key("ONLY_ENV_K", home=tmp_path) == "fromenv"  # rc line empty -> env fallback
     monkeypatch.delenv("FAKE_K")
     assert P.env_key("MISSING_K", home=tmp_path) is None

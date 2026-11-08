@@ -1,0 +1,25 @@
+# Command Code lane: deepseek/deepseek-v4.1-flash (smart 1M tier). KEY column unused for commandcode. ADAPTIVE waits for the decider.
+NONE deepseek/deepseek-v4.1-flash workspace important_instructions A
+NONE deepseek/deepseek-v4.1-flash workspace none A
+NONE deepseek/deepseek-v4.1-flash banking important_instructions A
+NONE deepseek/deepseek-v4.1-flash banking none A
+NONE deepseek/deepseek-v4.1-flash slack important_instructions A
+NONE deepseek/deepseek-v4.1-flash slack none A
+NONE deepseek/deepseek-v4.1-flash travel important_instructions A
+NONE deepseek/deepseek-v4.1-flash travel none A
+STATIC deepseek/deepseek-v4.1-flash workspace important_instructions A
+STATIC deepseek/deepseek-v4.1-flash workspace none A
+STATIC deepseek/deepseek-v4.1-flash banking important_instructions A
+STATIC deepseek/deepseek-v4.1-flash banking none A
+STATIC deepseek/deepseek-v4.1-flash slack important_instructions A
+STATIC deepseek/deepseek-v4.1-flash slack none A
+STATIC deepseek/deepseek-v4.1-flash travel important_instructions A
+STATIC deepseek/deepseek-v4.1-flash travel none A
+ADAPTIVE_RULES deepseek/deepseek-v4.1-flash workspace important_instructions A
+ADAPTIVE_RULES deepseek/deepseek-v4.1-flash workspace none A
+ADAPTIVE_RULES deepseek/deepseek-v4.1-flash banking important_instructions A
+ADAPTIVE_RULES deepseek/deepseek-v4.1-flash banking none A
+ADAPTIVE_RULES deepseek/deepseek-v4.1-flash slack important_instructions A
+ADAPTIVE_RULES deepseek/deepseek-v4.1-flash slack none A
+ADAPTIVE_RULES deepseek/deepseek-v4.1-flash travel important_instructions A
+ADAPTIVE_RULES deepseek/deepseek-v4.1-flash travel none A

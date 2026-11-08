@@ -35,16 +35,14 @@ def dir_name(model: str) -> str:
 
 
 def env_key(name: str, home: str | Path | None = None) -> str | None:
-    """Env var if set and non-empty, else the last `export NAME=...` line in ~/.zshrc (session env may be stale)."""
-    if os.environ.get(name):
-        return os.environ[name]
+    """Last `export NAME=...` line in ~/.zshrc wins (the user edits keys there; session env copies go stale and
+    caused 401s on Command Code); the env var is only the fallback when rc has no line."""
     rc = Path(home or os.path.expanduser("~")) / ".zshrc"
-    if not rc.exists():
-        return None
     val = None
-    for m in re.finditer(rf'^\s*export\s+{re.escape(name)}=(.*)$', rc.read_text(), re.M):
-        val = m.group(1).strip().strip('"').strip("'")
-    return val or None
+    if rc.exists():
+        for m in re.finditer(rf'^\s*export\s+{re.escape(name)}=(.*)$', rc.read_text(), re.M):
+            val = m.group(1).strip().strip('"').strip("'")
+    return val or os.environ.get(name) or None
 
 
 def resolve(model: str, key: str | None = "A", budget: dict | None = None) -> dict:

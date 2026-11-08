@@ -17,10 +17,12 @@ providers:
     reserve_usd: 5
     max_concurrent: 3          # assumed ("Standard" rate limits); back off on 429
     not_in_plan: [gpt-5.5, claude-fable-5, claude-opus-*]
+    # gate semantics (bench/budget.py): cap = month_usd − spent − reserve_usd, plus the 5 h and 7 d rolling windows
+    # deepseek-v4.1-flash measured 07:24: ≈ 19.5k prompt + 4.3k completion tokens per episode (≈ $0.0055)
   openrouter:                  # C16 (≈06:25 CET): user topped up $10
     base_url: https://openrouter.ai/api/v1
     key_env: OPENROUTER_API_KEY   # ~/.zshrc (session env stale)
-    cap_usd: 9.5
+    cap_usd: 9.5               # gate: no reserve on top (cap is the hard ceiling)
     allowed_models: [openai/gpt-4.1]
     purpose: paper anchor only
   groq:
@@ -45,7 +47,7 @@ priority:
   - {model: gpt-oss:20b,    configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE], suites: all, role: dumb tier}
   # Command Code lane (independent of Ollama; obey 5h/7d windows)
   - {provider: commandcode, model: deepseek/deepseek-v4.1-flash, configs: [NONE, STATIC, ADAPTIVE_RULES, ADAPTIVE], suites: all, role: smart 1M tier}
-  - {provider: commandcode, model: claude-haiku-5-5, configs: [NONE, ADAPTIVE], suites: all, role: optional 4th tier, only_if: fork anthropic provider accepts base_url with no new code}
+  # claude-haiku-5-5 dropped (P1-end): fork pipeline only speaks OpenAI /chat/completions; run.py refuses it
   # OpenRouter lane: gpt-4.1 paper anchor (C16), cap $9.5 total
   - {provider: openrouter, model: openai/gpt-4.1, configs: [NONE], note: already on disk (runs/mad/NONE/gpt-4.1, partial 329 episodes) - never extended}
   - {provider: openrouter, model: openai/gpt-4.1, configs: [ADAPTIVE], suites: [workspace, banking], attack: none, role: anchor utility}

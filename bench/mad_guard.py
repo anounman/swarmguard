@@ -51,7 +51,9 @@ def build_monitor(config: GuardConfig, monitor_cfg: dict | None):
         # host_env (SG_DECIDER_HOST) set -> use host_model (swarmguard-decider) there, else the cloud stand-in
         host = os.environ.get(c.get("host_env", ""), "")
         model, url = (c["host_model"], host) if host else (c["model"], c["base_url"])
-        return LLMMonitor(model, url, os.environ.get(c.get("key_env", "OLLAMA_API_KEY"), "ollama"))
+        from bench.providers import env_key  # rc-first loader (stale session env caused 401s)
+
+        return LLMMonitor(model, url, env_key(c.get("key_env", "OLLAMA_API_KEY")) or "ollama")
 
     cfg = monitor_cfg or {}
     if config == GuardConfig.ADAPTIVE_RULES:
