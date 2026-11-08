@@ -53,7 +53,7 @@ def build_monitor(config: GuardConfig, monitor_cfg: dict | None):
         model, url = (c["host_model"], host) if host else (c["model"], c["base_url"])
         from bench.providers import env_key  # rc-first loader (stale session env caused 401s)
 
-        return LLMMonitor(model, url, env_key(c.get("key_env", "OLLAMA_API_KEY")) or "ollama")
+        return LLMMonitor(model, url, env_key(c.get("key_env", "OLLAMA_API_KEY")) or "ollama", risk_map=c.get("risk_map"))
 
     cfg = monitor_cfg or {}
     if config == GuardConfig.ADAPTIVE_RULES:

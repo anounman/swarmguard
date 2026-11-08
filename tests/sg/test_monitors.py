@@ -78,3 +78,35 @@ def test_cascade_keeps_rules_verdict_when_llm_down():
 def test_egress_miss_alone_flags():
     w = [ev(EventKind.TOOL_CALL, "send_money", 1, label_out=Label(), meta={"egress": "x not in y"})]
     assert RulesMonitor().score(w, ROLE, "t").action == Action.FLAG
+
+
+def test_map_risk_interpolates_and_clamps():
+    from sg.monitors import map_risk
+
+    k = [[0, 0], [3, 3.9], [5, 6], [7, 8], [10, 10]]
+    assert map_risk(4, k) == pytest.approx(4.95)
+    assert map_risk(7, k) == 8 and map_risk(-1, k) == 0 and map_risk(12, k) == 10
+    assert map_risk(4.2, None) == 4.2
+
+
+class _Msg:
+    def __init__(self, txt):
+        self.choices = [type("C", (), {"message": type("M", (), {"content": txt})()})()]
+
+
+def _llm(txt, risk_map):
+    m = LLMMonitor("x", "http://localhost:1/v1", "k", risk_map=risk_map)
+    m.client = type("Cli", (), {"chat": type("Ch", (), {"completions": type("Co", (), {"create": lambda *a, **kw: _Msg(txt)})()})()})()
+    return m
+
+
+def test_llm_monitor_applies_risk_map():
+    w = [ev(EventKind.TOOL_CALL, "send_money", 1, args={"amount": 1})]
+    v = _llm('{"risk": 5, "category": "exfil", "rationale": "r"}', [[0, 0], [5, 8], [10, 10]]).score(w, ROLE, "t")
+    assert v.risk == 8 and v.category == "exfil" and v.rationale == "r"
+
+
+def test_llm_monitor_parse_failure_stays_unmapped():
+    w = [ev(EventKind.TOOL_CALL, "send_money", 1, args={"amount": 1})]
+    v = _llm("not json", [[0, 0], [5, 8], [10, 10]]).score(w, ROLE, "t")
+    assert v.risk == 5 and v.category == "unknown"

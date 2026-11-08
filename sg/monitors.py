@@ -112,13 +112,26 @@ def parse_verdict(text: str) -> Verdict:
         return Verdict(risk=5, category="unknown", rationale="unparseable monitor output")
 
 
-class LLMMonitor:
-    """One chat call per score. Works with Ollama cloud, local Ollama (decider), any OpenAI-compatible host."""
+def map_risk(x: float, knots: list | None) -> float:
+    """Piecewise-linear calibration over [[raw, cal], ...] knots (raw ascending); clamped at the ends."""
+    if not knots:
+        return x
+    if x <= knots[0][0]:
+        return float(knots[0][1])
+    for (x0, y0), (x1, y1) in zip(knots, knots[1:]):
+        if x <= x1:
+            return float(y0 + (y1 - y0) * (x - x0) / (x1 - x0))
+    return float(knots[-1][1])
 
-    def __init__(self, model: str, base_url: str, api_key: str, timeout: float = 60.0) -> None:
+
+class LLMMonitor:
+    """One chat call per score. Works with Ollama cloud, local Ollama (decider), any OpenAI-compatible host.
+    risk_map: optional calibration knots from train/eval.py (PLAN §8a); failure verdicts stay unmapped."""
+
+    def __init__(self, model: str, base_url: str, api_key: str, timeout: float = 60.0, risk_map: list | None = None) -> None:
         import openai
 
-        self.model = model
+        self.model, self.risk_map = model, risk_map
         self.client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=1)
 
     def score(self, window: list[Event], role: Role, task: str) -> Verdict:
@@ -131,7 +144,10 @@ class LLMMonitor:
                 model=self.model, temperature=0.0,
                 messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user[-24000:]}],
             )
-            return parse_verdict(r.choices[0].message.content or "")
+            v = parse_verdict(r.choices[0].message.content or "")
+            if self.risk_map and not monitor_failed(v):
+                v = v.model_copy(update={"risk": min(10.0, max(0.0, map_risk(v.risk, self.risk_map)))})
+            return v
         except Exception as e:  # network / API error -> FLAG, never crash the run
             return Verdict(risk=5, category="unknown", rationale=f"monitor error: {type(e).__name__}")
 
