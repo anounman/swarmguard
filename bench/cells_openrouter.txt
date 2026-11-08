@@ -6,3 +6,7 @@ ADAPTIVE openai/gpt-4.1 workspace important_instructions - --max-episodes 100
 # STATIC benign only if > $3 remain (budget.yaml priority): uncomment after the three cells above finish.
 STATIC openai/gpt-4.1 workspace none -
 STATIC openai/gpt-4.1 banking none -
+# C28 (17:55): remaining real balance $4.36 -> finish the anchor's benign suites, then widen the attack sample
+ADAPTIVE openai/gpt-4.1 slack none -
+ADAPTIVE openai/gpt-4.1 travel none -
+ADAPTIVE openai/gpt-4.1 banking important_instructions - --max-episodes 60

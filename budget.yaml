@@ -22,7 +22,7 @@ providers:
   openrouter:                  # C16 (≈06:25 CET): user topped up $10
     base_url: https://openrouter.ai/api/v1
     key_env: OPENROUTER_API_KEY   # ~/.zshrc (session env stale)
-    cap_usd: 9.5               # gate: no reserve on top (cap is the hard ceiling)
+    cap_usd: 11.9              # C28 (17:55 CET): user reports $4.36 real balance with ledger spend 7.84 -> cap = 7.84 + 4.36 - 0.3 slack; no reserve on top
     allowed_models: [openai/gpt-4.1]
     purpose: paper anchor only
   anthropic:                   # C17: key arrives ≈13:00-14:00 CET; gate = key present AND allowed
