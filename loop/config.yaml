@@ -14,7 +14,7 @@ ollama_keys:
   B: [slack, travel]
 smoke:                                # PLAN §5 stage 2: 1 user task x 1 injection task per suite
   model: gpt-oss:20b
-  configs: [NONE, ADAPTIVE_RULES]     # add ADAPTIVE once swarmguard-decider is served
+  configs: [NONE, ADAPTIVE_RULES, ADAPTIVE]   # ADAPTIVE added 09:30 CET: swarmguard-decider:v2 served + calibrated (C22)
   n: 1
   inj: injection_task_0               # first injection task id (exists in all 4 suites)
 # Lanes = budget.yaml priority. Lanes run concurrently (one thread each); within a lane items/configs run in order
