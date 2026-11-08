@@ -158,4 +158,4 @@ def test_decider_host_env_swaps_llm_monitor(monkeypatch):
     monkeypatch.delenv("SG_DECIDER_HOST", raising=False)
     assert build_monitor(GuardConfig.ADAPTIVE, cfg).llm.model == "gpt-oss:20b"
     monkeypatch.setenv("SG_DECIDER_HOST", "http://box:11434/v1")
-    assert build_monitor(GuardConfig.ADAPTIVE, cfg).llm.model == "swarmguard-decider"
+    assert build_monitor(GuardConfig.ADAPTIVE, cfg).llm.model.startswith("swarmguard-decider")  # tag varies (:v2, :v3)

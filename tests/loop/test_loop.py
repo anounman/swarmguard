@@ -189,7 +189,7 @@ def test_lanes_dry_run_plan(tmp_path, monkeypatch):
 
 def test_smoke_dry_run_plan(tmp_path, monkeypatch):
     cells = _plan(monkeypatch, tmp_path, "stage_smoke")
-    assert {c["--config"] for c in cells} == {"NONE", "ADAPTIVE_RULES"} and len(cells) == 2 * 4 * 2
+    assert {c["--config"] for c in cells} == {"NONE", "ADAPTIVE_RULES", "ADAPTIVE"} and len(cells) == 3 * 4 * 2  # C22: ADAPTIVE in smoke
     assert all(c["--n"] == "1" and c["--inj"] == "injection_task_0" and c["--model"] == "gpt-oss:20b" for c in cells)
 
 
