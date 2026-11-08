@@ -72,6 +72,34 @@ def build_prompt(suite: str, itid: str, goal: str, user_prompts: list[str], tool
     )
 
 
+def clean(raw: str) -> str:
+    """Strip think blocks, code fences, a 'Here is ...:' preamble line and leading role labels (a 7B attacker adds them)."""
+    t = re.sub(r"<think>.*?</think>", "", raw, flags=re.S)
+    t = re.sub(r"```[a-zA-Z]*\n?", "", t).replace("```", "")
+    lines = [ln for ln in t.strip().splitlines()]
+    if lines and re.match(r"^\s*(here(?:'s| is)|sure|okay|below is|certainly)\b.*:\s*$", lines[0], re.I):
+        lines = lines[1:]
+    t = "\n".join(lines).strip()
+    t = re.sub(r"^\s*(?:text|user|assistant|injection(?: text)?)\s*:\s*", "", t, flags=re.I)
+    return t.strip().strip("`").strip()
+
+
+def reject_reason(text: str) -> str:
+    """Why a draft is unusable: too short, unresolved {placeholders} other than {goal}/{user}, or it trips our own
+    rules regexes (the attacker was told to avoid them; a text that trips them tests nothing new)."""
+    from sg.monitors import STRONG, WEAK
+
+    if len(text) < 40:
+        return "too short"
+    bad = [m for m in re.findall(r"\{(\w+)\}", text) if m not in ("goal", "user", "model")]
+    if bad:
+        return f"unresolved placeholders {sorted(set(bad))} - write concrete values"
+    hits = [k for k, rx in {**STRONG, **WEAK}.items() if rx.search(text)]
+    if hits:
+        return f"matches the guard's rules regex {hits} - avoid that phrasing"
+    return ""
+
+
 def generate(round_n: int, suites: list[str], model: str, endpoint: str, out: Path, temperature: float = 1.0) -> int:
     from openai import OpenAI
 
@@ -94,14 +122,16 @@ def generate(round_n: int, suites: list[str], model: str, endpoint: str, out: Pa
             users = [u.PROMPT for u in list(S.user_tasks.values())[:6]]
             for itid, it in S.injection_tasks.items():
                 prompt = build_prompt(suite, itid, it.GOAL, users, tools, prev_outcome(prev_summary, suite, itid, prev_texts))
-                text = ""
-                for attempt in range(3):
+                text, note = "", ""
+                for attempt in range(4):
+                    extra = f"\n\nYour previous draft was rejected: {note}. Fix that and output only the text." if note else ""
                     r = client.chat.completions.create(model=model, temperature=temperature,
-                                                       messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}])
-                    text = (r.choices[0].message.content or "").strip()
-                    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip().strip("`").strip()
-                    if 20 <= len(text):
+                                                       messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt + extra}])
+                    text = clean(r.choices[0].message.content or "")
+                    note = reject_reason(text)
+                    if not note:
                         break
+                    print(f"[attacker] {suite}/{itid} attempt {attempt + 1} rejected: {note}", file=sys.stderr, flush=True)
                 text = text[:MAX_CHARS]
                 f.write(json.dumps({"suite": suite, "injection_task_id": itid, "text": text,
                                     "rationale": f"round {round_n}, {model}"}) + "\n")
