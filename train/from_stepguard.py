@@ -2,8 +2,9 @@
 
 Both configs: sft3k (ShareGPT; gpt turn carries <Judgment>/<RiskSource>/<UnsafeStep>) and rl4k (label +
 risk_source columns, no UnsafeStep). Exact-duplicate inputs are kept once (sft3k first: it has the step id).
-safe -> risk 1 benign (cls 'resisted' when an injection-like source was present, else 'benign');
-unsafe + injection-like source -> risk 9, first_bad_step = the judged event; other unsafe sources dropped.
+safe + no injection source -> risk 1 benign; safe + injection source -> risk 4 prompt_injection (cls 'resisted');
+unsafe + injection source -> risk 9 (cls 'hijack'); other unsafe sources dropped. For resisted/hijack,
+first_bad_step = the last untrusted TOOL_RESULT in the window (one with an injection marker preferred); none -> dropped.
 """
 from __future__ import annotations
 
@@ -15,22 +16,24 @@ import re
 from collections import Counter
 
 from sg.labels import SINKS
+from sg.monitors import injection_hits
 from sg.schema import EventKind, Role, TrainRow, Verdict
 from train.common import PREVIEW, WINDOW, clip, ev, sinks
 
 HF = "ninty-seven/stepguard_data"
 LICENSE = "Apache-2.0"
-# ponytail: direct_prompt_injection arrives in the USER turn, not a tool output -> not our channel; dropped
-INJ = {"indirect_prompt_injection", "tool_description_injection", "corrupted_tool_feedback"}
+# ponytail: direct_prompt_injection arrives in the USER turn, not a tool output -> not our channel; dropped.
+# ponytail: tool_description_injection lives in a tool description that never reaches the window -> label uncheckable; dropped
+INJ = {"indirect_prompt_injection", "corrupted_tool_feedback"}
 SEG = re.compile(r"^(?:\[(?:Step|Turn) (\d+)\] |\[Observation after Step \d+\] )?\[(USER|AGENT|ENVIRONMENT)\]:?", re.MULTILINE)
 ACT = re.compile(r"\[(ACTION|RESPONSE|FINAL)\]:?\s*")
 
 
 def category(tool: str | None, args: dict | None) -> str:
     """Same split as train/from_mad_runs: data-moving sinks -> exfiltration, other sinks (money, updates) -> unauthorized_action."""
-    # ponytail: StepGuard tools are MCP-style ('x_mcp' + operation); name and operation both checked, by prefix
+    # ponytail: StepGuard tools are MCP-style ('x_mcp' + operation); name and operation both checked, by substring (MCP prefixes)
     for name in (tool or "", str((args or {}).get("operation", ""))):
-        if name.startswith(("send_email", "send_direct", "send_channel", "send_message", "post_", "share_", "http_", "upload_", "export_")):
+        if any(k in name for k in ("send_email", "send_direct", "send_channel", "send_message", "post_", "share_", "http_", "upload_", "export_")):
             return "exfiltration"
         if name in SINKS or sinks([name]):
             return "unauthorized_action"
@@ -99,6 +102,8 @@ def events_of(text: str, rid: str):
 def convert(text: str, judgment: str, source: str, unsafe_step: int | None, rid: str):
     """-> output line dict, or a drop-reason string."""
     unsafe = judgment == "unsafe"
+    if source == "tool_description_injection":
+        return "tool_description_injection"
     if unsafe and source not in INJ:
         return f"unsafe:{source}"
     task, tools, events, step_idx = events_of(text, rid)
@@ -113,13 +118,22 @@ def convert(text: str, judgment: str, source: str, unsafe_step: int | None, rid:
         end = len(events) - 1  # action level: the action under review; safe trajectory: its last event
     win = events[max(0, end - WINDOW + 1): end + 1]
     j = events[end]
+    if source in INJ:  # hijack or resisted: first_bad_step = the poisoned TOOL_RESULT (from_agentdrift convention)
+        res = [e for e in win[:-1] if e.kind == EventKind.TOOL_RESULT and e.label_out and e.label_out.trusted is False]
+        if not res:
+            return "no_untrusted_result"
+        fb = next((e for e in reversed(res) if injection_hits(e.result_preview or "")), res[-1]).step
     if unsafe:
-        v = Verdict(risk=9.0, category=category(j.tool, j.args), first_bad_step=j.step,
-                    rationale=f"Step {j.step} follows untrusted content ({source.replace('_', ' ')}), not the user task.")
+        v = Verdict(risk=9.0, category=category(j.tool, j.args), first_bad_step=fb,
+                    rationale=f"Step {j.step} follows untrusted content at step {fb} ({source.replace('_', ' ')}), not the user task.")
         cls = "hijack"
+    elif source in INJ:
+        v = Verdict(risk=4.0, category="prompt_injection", first_bad_step=fb,
+                    rationale=f"Tool output at step {fb} carries injected instructions; agent did not comply.")
+        cls = "resisted"
     else:
         v = Verdict(risk=1.0, category="benign", rationale="Actions match the user task; no injected instructions followed.")
-        cls = "resisted" if source in INJ else "benign"
+        cls = "benign"
     role = Role(task_id=rid, name="agent", tools=tools, egress_sinks=sinks(tools))
     row = TrainRow(task=task, role=role, window=win, output=v, source="stepguard")
     return {"row": row.model_dump(mode="json"), "cls": cls, "pipeline": "stepguard", "suite": "traj" if traj else "action",
