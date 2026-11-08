@@ -38,7 +38,7 @@ harvest:
 # train/data_v3/BOX_COMMANDS.md a-c (push, train, export), printed with the new tag and executed by the orchestrator over ssh (C8);
 # calibrate = train/eval.py on val (+ held-out tests) against $SG_DECIDER_HOST -> loop/iter_N/risk_map.yaml.
 decider:
-  version: 2                          # tag served now (swarmguard-decider:v2); retrain builds v{version+1}.
+  version: 3                          # tag served + calibrated now (swarmguard-decider:v3, 12:13 CET, C25); v2 stays served; retrain builds v{version+1}.
                                       # Orchestrator bumps this once the new tag is served + calibrated.
   host_env: SG_DECIDER_HOST           # env var holding the served decider endpoint (http://<box>:11434/v1)
   base: ninty-seven/StepGuard         # decided C20 (PLAN §8a item 4, BOX_COMMANDS.md b); fallback Qwen/Qwen3-4B-Instruct-2507 if it fails to load / breaks ChatML
