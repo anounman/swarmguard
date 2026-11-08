@@ -119,7 +119,7 @@ def main():
     ap.add_argument("--base", default="Qwen/Qwen3-4B-Instruct-2507")
     ap.add_argument("--adapter", default="")
     ap.add_argument("--limit", type=int, default=0, help="rows per split (0 = all)")
-    ap.add_argument("--out", default="results/decider_eval.json")
+    ap.add_argument("--out", default="results/decider_eval_raw.json")  # ponytail: results/decider_eval.json is the loop's flat summary
     a = ap.parse_args()
     fn = endpoint_fn(a.endpoint, a.model, a.api_key) if a.endpoint else hf_fn(a.base, a.adapter)
     res = {"model": a.model if a.endpoint else (a.adapter or a.base), "splits": {}}

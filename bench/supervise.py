@@ -2,15 +2,21 @@
 
 ponytail: pgrep-based liveness + done-marker files; the loop's bench stage will subsume this.
 Usage: uv run python bench/supervise.py cells.txt [--max-live 20]
-cells.txt lines: CONFIG MODEL SUITE ATTACK KEY
+cells.txt lines: CONFIG MODEL SUITE ATTACK KEY [extra run.py args...]   (KEY '-' = no --key, non-ollama)
 """
 import os, re, subprocess, sys, time
 from pathlib import Path
 
-cells = [l.split() for l in Path(sys.argv[1]).read_text().splitlines() if l.strip() and not l.startswith("#")]
-max_live = int(sys.argv[sys.argv.index("--max-live") + 1]) if "--max-live" in sys.argv else 20
-DONE = Path("runs/mad/.done"); DONE.mkdir(parents=True, exist_ok=True)
+DONE = Path("runs/mad/.done")
 tries: dict[str, int] = {}
+
+def parse_cells(text: str) -> list[list[str]]:
+    return [l.split() for l in text.splitlines() if l.strip() and not l.lstrip().startswith("#")]
+
+def run_args(c) -> list[str]:
+    """run.py args for a cell: '--attack X' stays right before --key/extras so alive()'s pattern still matches."""
+    return (["--bench", "mad", "--config", c[0], "--model", c[1], "--suite", c[2], "--attack", c[3]]
+            + (["--key", c[4]] if c[4] != "-" else []) + c[5:])
 
 def key_env() -> dict:
     env = dict(os.environ)
@@ -28,27 +34,30 @@ def marker(c) -> Path:
 
 def gate_allows(c) -> bool:
     """Ask run.py --dry-run (no model calls). rc 0 = allow; rc 2 = budget/window refusal -> wait, do not count a try."""
-    r = subprocess.run(["uv", "run", "python", "bench/run.py", "--bench", "mad", "--config", c[0], "--model", c[1],
-                        "--suite", c[2], "--attack", c[3], "--key", c[4], "--dry-run"], capture_output=True, text=True, env=key_env())
+    r = subprocess.run(["uv", "run", "python", "bench/run.py", *run_args(c), "--dry-run"], capture_output=True, text=True, env=key_env())
     if r.returncode == 2:
         print(time.strftime("%H:%M:%S"), "gate refused, waiting:", *c[:4], (r.stdout.strip().splitlines() or [""])[-1][:160], flush=True)
     return r.returncode == 0
 
 def launch(c):
     log = Path(f"runs/mad/{c[0]}/{c[1].rsplit('/', 1)[-1]}"); log.mkdir(parents=True, exist_ok=True)
-    cmd = (f"uv run python bench/run.py --bench mad --config {c[0]} --model {c[1]} --suite {c[2]} --attack {c[3]} --key {c[4]} "
+    cmd = (f"uv run python bench/run.py {' '.join(run_args(c))} "
            f">> {log}/{c[2]}-{c[3]}.log 2>&1 && touch {marker(c)}")
     subprocess.Popen(["sh", "-c", cmd], env=key_env(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     tries[marker(c).name] = tries.get(marker(c).name, 0) + 1
     print(time.strftime("%H:%M:%S"), "launch", *c[:4], "try", tries[marker(c).name], flush=True)
 
-while True:
-    pending = [c for c in cells if not marker(c).exists() and tries.get(marker(c).name, 0) < 6]
-    if not pending:
-        print(time.strftime("%H:%M:%S"), "all cells done", flush=True); break
-    live = [c for c in pending if alive(c)]
-    for c in pending:
-        if len(live) >= max_live: break
-        if not alive(c) and gate_allows(c):
-            launch(c); live.append(c); time.sleep(2)
-    time.sleep(60)
+if __name__ == "__main__":
+    cells = parse_cells(Path(sys.argv[1]).read_text())
+    max_live = int(sys.argv[sys.argv.index("--max-live") + 1]) if "--max-live" in sys.argv else 20
+    DONE.mkdir(parents=True, exist_ok=True)
+    while True:
+        pending = [c for c in cells if not marker(c).exists() and tries.get(marker(c).name, 0) < 6]
+        if not pending:
+            print(time.strftime("%H:%M:%S"), "all cells done", flush=True); break
+        live = [c for c in pending if alive(c)]
+        for c in pending:
+            if len(live) >= max_live: break
+            if not alive(c) and gate_allows(c):
+                launch(c); live.append(c); time.sleep(2)
+        time.sleep(60)

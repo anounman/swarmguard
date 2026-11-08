@@ -181,3 +181,24 @@ def test_run_suite_books_spend_when_pipeline_crashes(tmp_path, monkeypatch):
         run.run_suite(a, BUD)
     (row,) = B.read_spend()
     assert row["crashed"] and row["est_usd"] == 2 and row["run_id"] == "r-banking"
+
+
+def test_dry_run_missing_key_refuses_rc2(tmp_path, monkeypatch, capsys):
+    from bench import run
+    _env(tmp_path, monkeypatch, cap=100)
+    bud = yaml.safe_load((tmp_path / "b.yaml").read_text())
+    bud["providers"]["anthropic"] = {"base_url": "https://api.anthropic.com/v1", "key_env": "ANTHROPIC_API_KEY",
+                                     "cap_usd": 95, "reserve_usd": 5, "allowed_models": ["claude-sonnet-5-5"]}
+    bud["prices"]["claude-sonnet-5-5"] = {"input": 3, "output": 15, "provider": "anthropic"}
+    (tmp_path / "b.yaml").write_text(yaml.safe_dump(bud))
+    monkeypatch.setattr(P, "env_key", lambda name, home=None: None)
+    args = ["--config", "NONE", "--model", "claude-sonnet-5-5", "--suite", "banking", "--attack", "none",
+            "--logdir", str(tmp_path / "logs")]
+    for extra in (["--dry-run"], []):  # real path refuses too, before any reservation
+        assert run.main(args + extra) == 2
+        assert "GATE REFUSE provider=anthropic" in capsys.readouterr().out
+    assert not (tmp_path / "spend.jsonl").exists()
+    monkeypatch.setattr(P, "env_key", lambda name, home=None: "sk-test-fake")
+    monkeypatch.setattr(run, "plan", lambda a, s: ([0] * 144, [0] * 144))  # no agentdojo needed
+    assert run.main(args + ["--dry-run"]) == 0  # 144 * (6000*3 + 2000*15)/1e6 = $6.91
+    assert "GATE ALLOW provider=anthropic" in (out := capsys.readouterr().out) and "projected_usd=6.912" in out

@@ -6,7 +6,7 @@ LOOPDIR ?= loop
 TRAIN ?= train
 L = uv run python -m loop.loop --iter $(ITER) --runs $(RUNS) --results $(RESULTS) --loopdir $(LOOPDIR) --train-dir $(TRAIN)
 
-.PHONY: loop smoke bench metrics compare harvest retrain report test dry-run
+.PHONY: loop smoke bench metrics compare harvest retrain calibrate report test dry-run
 loop: ; $(L) --stage all
 smoke: ; $(L) --stage smoke
 bench: ; $(L) --stage bench
@@ -14,6 +14,7 @@ dry-run: ; $(L) --stage all --dry-run   # plan + budget-gate decision per cell; 
 metrics: ; $(L) --stage metrics
 compare: ; $(L) --stage compare
 harvest: ; $(L) --stage harvest
-retrain: ; $(L) --stage retrain
+retrain: ; $(L) --stage retrain        # dataset -> box (printed) -> calibrate
+calibrate: ; $(L) --stage retrain --sub calibrate   # once the new decider tag is served at $$SG_DECIDER_HOST
 report: ; uv run python docs/render.py --metrics $(RESULTS)/metrics.json
 test: ; uv run pytest -q

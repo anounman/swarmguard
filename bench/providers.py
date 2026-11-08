@@ -10,10 +10,11 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 BUDGET = ROOT / "budget.yaml"
 # legacy CLI names -> budget.yaml price keys. gpt-4.1 goes to OpenRouter, NEVER OpenAI direct (C13/C16).
-ALIASES = {"gpt-4.1": "openai/gpt-4.1", "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash"}
+ALIASES = {"gpt-4.1": "openai/gpt-4.1", "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
+           "kimi-k3.1-pro": "moonshotai/Kimi-K3.1-Pro"}
 OLLAMA_KEYS = {"A": "OLLAMA_API_KEY", "B": "OLLAMA_API_KEY1"}
 MODELS = ["gpt-oss:120b", "gpt-oss:20b", "deepseek/deepseek-v4.1-flash", "openai/gpt-4.1", "claude-haiku-5-5",
-          "kimi-k3.1-pro", *ALIASES]
+          "claude-sonnet-5-5", "claude-opus-5-5", "moonshotai/Kimi-K3.1-Pro", *ALIASES]
 
 
 def load_budget(path: str | Path | None = None) -> dict:
@@ -53,13 +54,9 @@ def resolve(model: str, key: str | None = "A", budget: dict | None = None) -> di
     pcfg = budget["providers"].get(prov) or {}
     if pcfg.get("allowed") is False or prov in ("openai", "groq"):
         raise ValueError(f"provider {prov} not allowed by budget.yaml")
-    if m == "claude-haiku-5-5":
-        # ponytail: fork pipeline (bench/mad_guard.make_pipeline) only speaks OpenAI /chat/completions; haiku needs
-        # Anthropic /messages with a base_url -> would need new code, so it stays out (budget.yaml only_if).
-        raise ValueError("claude-haiku-5-5 needs the Anthropic /messages endpoint; mad_guard.make_pipeline is "
-                         "OpenAI-only -> not supported without new code")
-    if prov == "openrouter" and m not in pcfg.get("allowed_models", [m]):
-        raise ValueError(f"{m} not in openrouter.allowed_models")
+    # anthropic (incl. haiku) goes through Anthropic's OpenAI-compat /v1/chat/completions -> no special case
+    if prov in ("openrouter", "anthropic") and m not in pcfg.get("allowed_models", [m]):
+        raise ValueError(f"{m} not in {prov}.allowed_models")
     if prov == "ollama":
         key = key or "A"
         key_name = OLLAMA_KEYS[key]

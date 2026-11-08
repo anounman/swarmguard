@@ -1,48 +1,50 @@
 {
- "files": 2672,
- "dup": 962,
- "rows": 2311,
+ "files": 3610,
+ "dup": 1229,
+ "rows": 3418,
  "cls": {
-  "benign": 1091,
-  "hijack": 199,
-  "resisted": 1021
+  "benign": 1632,
+  "hijack": 404,
+  "resisted": 1382
  },
  "source": {
-  "deepseek-v4.1-flash": 147,
-  "gpt-4.1": 237,
-  "gpt-oss:120b": 1663,
-  "gpt-oss:20b": 264
+  "deepseek-v4.1-flash": 494,
+  "gpt-4.1": 234,
+  "gpt-oss:120b": 2314,
+  "gpt-oss:20b": 376
  },
  "config": {
-  "ADAPTIVE_RULES": 339,
-  "NONE": 1497,
-  "STATIC": 475
+  "ADAPTIVE_RULES": 563,
+  "NONE": 2050,
+  "STATIC": 805
  },
  "category": {
-  "benign": 1091,
-  "exfiltration": 32,
-  "prompt_injection": 1055,
-  "unauthorized_action": 133
+  "benign": 1632,
+  "exfiltration": 73,
+  "prompt_injection": 1474,
+  "unauthorized_action": 239
  },
  "config/source/cls": {
-  "ADAPTIVE_RULES/gpt-oss:120b/benign": 136,
-  "ADAPTIVE_RULES/gpt-oss:120b/hijack": 4,
-  "ADAPTIVE_RULES/gpt-oss:120b/resisted": 199,
-  "NONE/deepseek-v4.1-flash/benign": 110,
-  "NONE/deepseek-v4.1-flash/resisted": 37,
-  "NONE/gpt-4.1/benign": 91,
-  "NONE/gpt-4.1/hijack": 78,
-  "NONE/gpt-4.1/resisted": 68,
-  "NONE/gpt-oss:120b/benign": 422,
-  "NONE/gpt-oss:120b/hijack": 98,
-  "NONE/gpt-oss:120b/resisted": 394,
+  "ADAPTIVE_RULES/gpt-oss:120b/benign": 228,
+  "ADAPTIVE_RULES/gpt-oss:120b/hijack": 33,
+  "ADAPTIVE_RULES/gpt-oss:120b/resisted": 302,
+  "NONE/deepseek-v4.1-flash/benign": 324,
+  "NONE/deepseek-v4.1-flash/hijack": 17,
+  "NONE/deepseek-v4.1-flash/resisted": 153,
+  "NONE/gpt-4.1/benign": 90,
+  "NONE/gpt-4.1/hijack": 86,
+  "NONE/gpt-4.1/resisted": 58,
+  "NONE/gpt-oss:120b/benign": 519,
+  "NONE/gpt-oss:120b/hijack": 128,
+  "NONE/gpt-oss:120b/resisted": 476,
   "NONE/gpt-oss:20b/benign": 119,
-  "NONE/gpt-oss:20b/hijack": 18,
-  "NONE/gpt-oss:20b/resisted": 62,
-  "STATIC/gpt-oss:120b/benign": 172,
-  "STATIC/gpt-oss:120b/hijack": 1,
-  "STATIC/gpt-oss:120b/resisted": 237,
-  "STATIC/gpt-oss:20b/benign": 41,
-  "STATIC/gpt-oss:20b/resisted": 24
+  "NONE/gpt-oss:20b/hijack": 27,
+  "NONE/gpt-oss:20b/resisted": 53,
+  "STATIC/gpt-oss:120b/benign": 261,
+  "STATIC/gpt-oss:120b/hijack": 90,
+  "STATIC/gpt-oss:120b/resisted": 277,
+  "STATIC/gpt-oss:20b/benign": 91,
+  "STATIC/gpt-oss:20b/hijack": 23,
+  "STATIC/gpt-oss:20b/resisted": 63
  }
 }

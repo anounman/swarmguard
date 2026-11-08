@@ -141,6 +141,11 @@ def main(argv=None) -> int:
     except ValueError as e:
         print(f"REFUSE {e}", file=sys.stderr)
         return 2
+    if a.res["provider"] != "ollama" and not P.env_key(a.res["key_name"]):  # before gate: no orphan reservation
+        # ponytail: ollama keys stay checked late (provider_env) -- suite all splits A/B across children
+        print(f"GATE REFUSE provider={a.res['provider']} model={P.canonical(a.model)} "
+              f"reason={a.res['key_name']} not set (env or ~/.zshrc)", flush=True)
+        return 2  # supervise.py: rc 2 = wait, not a try
     a.logdir = a.logdir or str(ROOT / "runs/mad" / a.config / P.dir_name(a.model))
     if a.config == "NONE" and P.canonical(a.model) == "openai/gpt-4.1" and not a.name:
         a.name = "openai-compatible-multi-agent"  # resume the paid raw-fork-CLI baseline logs (now via OpenRouter)

@@ -1,9 +1,12 @@
 """v2 train/val + MAD rows + synth rows -> train/data_v3/{train,val,test_mad_ood}.jsonl + stats.json (PLAN §8a item 5).
 
-- MAD rows from the held-out model (deepseek-v4.1-flash) -> test_mad_ood only (OOD by model); never train/val.
+- MAD rows from the held-out model (deepseek-v4.1-flash) -> test_mad_ood only (OOD by model); never train/val. Any other
+  new row whose pipeline names the held-out model (e.g. loop harvest 'mad:ADAPTIVE:deepseek-v4.1-flash') is dropped;
+  synth rows ('synth-deepseek-...', teacher = held-out model) are kept.
 - v2 train -> train, v2 val -> val (v2 test_ood / test_drift stay in train/data, untouched; rows whose prompt is there are dropped).
 - New sources (MAD, synth, --extra) -> train/val by run_id hash (1 in 10 -> val).
-- Dedupe on task+window+output across everything; val/test also drop any prompt seen in train (as train/splits.py).
+- Dedupe on the prompt (task+window) across all splits; on a label conflict the higher-risk copy wins, so each prompt
+  lands in exactly one split once (as train/splits.py).
 - Class groups by gold risk: hijacked >= 8, benign <= 2, failed = the rest (4 resisted, 6 injection seen). Max/min <= 2:1,
   synth <= 30% of train; down-sampling drops v2 rows first.
 Lines are written by train.splits.emit (chat "messages" + raw "row").
@@ -16,8 +19,6 @@ import json
 import random
 from collections import Counter
 
-from sg.schema import TrainRow
-from train.common import verdict_json
 from train.splits import emit, key, load
 
 HELD_OUT = "deepseek-v4.1-flash"
@@ -27,10 +28,6 @@ NEW = ("mad", "synth", "extra")  # kept first when balancing
 def grp(r) -> str:
     risk = r["row"]["output"]["risk"]
     return "hijacked" if risk >= 8 else "benign" if risk <= 2 else "failed"
-
-
-def fkey(r) -> str:  # task + window + output
-    return key(r) + hashlib.md5(verdict_json(TrainRow.model_validate(r["row"]).output).encode()).hexdigest()
 
 
 def norm(r, origin: str) -> dict:
@@ -45,13 +42,22 @@ def is_val(r) -> bool:
     return int(hashlib.md5(r["row"]["window"][0]["run_id"].encode()).hexdigest(), 16) % 10 == 0
 
 
-def dedup(rows, seen: set, ban: set = frozenset()):
-    out = []
+def held_out(r) -> bool:
+    return HELD_OUT in str(r["pipeline"]) and not str(r["pipeline"]).startswith("synth")
+
+
+def winners(rows) -> dict:
+    """prompt key -> the one row kept for it: highest gold risk, first seen on ties."""
+    top = {}
     for r in rows:
-        if fkey(r) not in seen and key(r) not in ban:
-            seen.add(fkey(r))
-            out.append(r)
-    return out
+        k = key(r)
+        if k not in top or r["row"]["output"]["risk"] > top[k]["row"]["output"]["risk"]:
+            top[k] = r
+    return top
+
+
+def dedup(rows, top: dict, ban: set = frozenset()):
+    return [r for r in rows if top[key(r)] is r and key(r) not in ban]
 
 
 def shape(rows, ratio=2.0, synth_cap=0.30, seed=0):
@@ -97,15 +103,14 @@ def main():
     a = ap.parse_args()
     ban = {key(r) for s in ("test_ood", "test_drift") for r in load(f"{a.v2}/{s}.jsonl")}
     mad = [norm(r, "mad") for r in load(a.mad)]
-    new = [r for r in mad if r["pipeline"] != HELD_OUT] + [norm(r, "synth") for r in load(a.synth)] \
-        + [norm(r, "extra") for p in a.extra for r in load(p)]
-    seen = set()
-    train = dedup([norm(r, "v2") for r in load(f"{a.v2}/train.jsonl")] + [r for r in new if not is_val(r)], seen, ban)
-    train = shape(train)
-    tk = {key(r) for r in train} | ban
-    splits = {"train": train,
-              "val": shape(dedup([norm(r, "v2") for r in load(f"{a.v2}/val.jsonl")] + [r for r in new if is_val(r)], seen, tk)),
-              "test_mad_ood": dedup([r for r in mad if r["pipeline"] == HELD_OUT], seen, tk)}
+    new = [r for r in mad + [norm(r, "synth") for r in load(a.synth)] + [norm(r, "extra") for p in a.extra for r in load(p)]
+           if not held_out(r)]
+    cand = {"train": [norm(r, "v2") for r in load(f"{a.v2}/train.jsonl")] + [r for r in new if not is_val(r)],
+            "val": [norm(r, "v2") for r in load(f"{a.v2}/val.jsonl")] + [r for r in new if is_val(r)],
+            "test_mad_ood": [r for r in mad if r["pipeline"] == HELD_OUT]}
+    top = winners([r for rows in cand.values() for r in rows])  # one copy per prompt across all three splits
+    splits = {"train": shape(dedup(cand["train"], top, ban)), "val": shape(dedup(cand["val"], top, ban)),
+              "test_mad_ood": dedup(cand["test_mad_ood"], top, ban)}
     stats = {"held_out_source": HELD_OUT, "inputs": {"v2": a.v2, "mad": a.mad, "synth": a.synth, "extra": a.extra},
              "notes": {"test_mad_ood": f"MAD bench windows from {HELD_OUT} (unseen agent model, seen tasks)",
                        "v2_tests": f"{a.v2}/test_ood.jsonl + test_drift.jsonl unchanged"}, "splits": {}}

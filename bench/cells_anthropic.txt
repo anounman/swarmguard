@@ -1,0 +1,12 @@
+# Anthropic lane (C17): claude-sonnet-5-5 via Anthropic's OpenAI-compat layer (https://api.anthropic.com/v1).
+# Cost: ~$0.09/episode (20k prompt x $3 + 2k completion x $15 per 1M) x (112 benign + 300 ws-II + 288 bank-II)
+#       = ~700 episodes = ~$63 of the $90 usable (cap 95 - reserve 5). KEY '-' = no --key (non-ollama).
+# Opus: none for now (priority: only if >= $40 left after Sonnet).
+NONE claude-sonnet-5-5 workspace none -
+ADAPTIVE claude-sonnet-5-5 workspace none -
+NONE claude-sonnet-5-5 banking none -
+ADAPTIVE claude-sonnet-5-5 banking none -
+NONE claude-sonnet-5-5 workspace important_instructions - --max-episodes 150
+ADAPTIVE claude-sonnet-5-5 workspace important_instructions - --max-episodes 150
+NONE claude-sonnet-5-5 banking important_instructions -
+ADAPTIVE claude-sonnet-5-5 banking important_instructions -

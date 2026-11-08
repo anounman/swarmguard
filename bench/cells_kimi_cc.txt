@@ -1,0 +1,10 @@
+# Command Code lane (C18): moonshotai/Kimi-K3.1-Pro, gated by the 5h/7d windows. Banking first.
+NONE moonshotai/Kimi-K3.1-Pro banking none -
+ADAPTIVE moonshotai/Kimi-K3.1-Pro banking none -
+NONE moonshotai/Kimi-K3.1-Pro banking important_instructions -
+ADAPTIVE moonshotai/Kimi-K3.1-Pro banking important_instructions -
+# workspace only if the 7d window has > $30 left (budget.yaml priority) - uncomment by hand then:
+# NONE moonshotai/Kimi-K3.1-Pro workspace none -
+# ADAPTIVE moonshotai/Kimi-K3.1-Pro workspace none -
+# NONE moonshotai/Kimi-K3.1-Pro workspace important_instructions -
+# ADAPTIVE moonshotai/Kimi-K3.1-Pro workspace important_instructions -

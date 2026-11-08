@@ -1,0 +1,163 @@
+{
+ "held_out_source": "deepseek-v4.1-flash",
+ "inputs": {
+  "v2": "train/data",
+  "mad": "train/data_v3/mad_rows.jsonl",
+  "synth": "train/data_v3/synth_rows.jsonl",
+  "extra": []
+ },
+ "notes": {
+  "test_mad_ood": "MAD bench windows from deepseek-v4.1-flash (unseen agent model, seen tasks)",
+  "v2_tests": "train/data/test_ood.jsonl + test_drift.jsonl unchanged"
+ },
+ "splits": {
+  "train": {
+   "n": 13417,
+   "by_group": {
+    "failed": 4981,
+    "hijacked": 3716,
+    "benign": 4720
+   },
+   "by_class": {
+    "injection": 1600,
+    "success": 3377,
+    "resisted": 1081,
+    "benign": 4720,
+    "hijack": 339,
+    "failed": 2300
+   },
+   "by_origin": {
+    "v2": 10300,
+    "mad": 2587,
+    "synth": 530
+   },
+   "by_source": {
+    "agentdrift": 3600,
+    "gpt-4o-mini-2024-07-18": 226,
+    "gpt-oss:120b": 2050,
+    "gpt-4o-2024-05-13": 1928,
+    "gemini-1.5-pro-001": 219,
+    "claude-3-sonnet-20240229": 217,
+    "gpt-oss:20b": 323,
+    "command-r-plus": 308,
+    "claude-3-5-sonnet-20240620": 267,
+    "gemini-2.0-flash-exp": 134,
+    "synth-deepseek-v4.1-flash": 530,
+    "gpt-4-0125-preview": 298,
+    "local": 1185,
+    "gpt-3.5-turbo-0125": 188,
+    "command-r": 310,
+    "meta-llama_Llama-3-70b-chat-hf": 214,
+    "claude-3-opus-20240229": 173,
+    "gemini-1.5-pro-002": 186,
+    "gemini-1.5-flash-001": 155,
+    "claude-3-5-sonnet-20241022": 191,
+    "gpt-4.1": 214,
+    "claude-3-haiku-20240307": 161,
+    "gpt-4-turbo-2024-04-09": 227,
+    "gemini-1.5-flash-002": 113
+   },
+   "by_config": {
+    "None": 10830,
+    "ADAPTIVE_RULES": 495,
+    "STATIC": 705,
+    "NONE": 1387
+   },
+   "by_risk": {
+    "6.0": 1600,
+    "9.0": 3716,
+    "4.0": 3381,
+    "1.0": 4720
+   },
+   "synth_share": 0.03950212417082805
+  },
+  "val": {
+   "n": 1212,
+   "by_group": {
+    "benign": 436,
+    "failed": 439,
+    "hijacked": 337
+   },
+   "by_class": {
+    "benign": 436,
+    "injection": 133,
+    "resisted": 115,
+    "success": 289,
+    "failed": 191,
+    "hijack": 48
+   },
+   "by_origin": {
+    "synth": 70,
+    "v2": 855,
+    "mad": 287
+   },
+   "by_source": {
+    "synth-deepseek-v4.1-flash": 70,
+    "agentdrift": 299,
+    "gpt-oss:120b": 230,
+    "gpt-4o-mini-2024-07-18": 22,
+    "gpt-4o-2024-05-13": 176,
+    "gemini-1.5-pro-001": 19,
+    "claude-3-sonnet-20240229": 20,
+    "gpt-4.1": 18,
+    "claude-3-haiku-20240307": 16,
+    "command-r-plus": 18,
+    "gpt-3.5-turbo-0125": 17,
+    "gpt-4-turbo-2024-04-09": 14,
+    "gemini-1.5-pro-002": 18,
+    "meta-llama_Llama-3-70b-chat-hf": 29,
+    "claude-3-opus-20240229": 9,
+    "local": 87,
+    "gemini-2.0-flash-exp": 19,
+    "command-r": 18,
+    "gpt-oss:20b": 39,
+    "gpt-4-0125-preview": 24,
+    "claude-3-5-sonnet-20240620": 15,
+    "claude-3-5-sonnet-20241022": 14,
+    "gemini-1.5-flash-002": 9,
+    "gemini-1.5-flash-001": 12
+   },
+   "by_config": {
+    "None": 925,
+    "NONE": 157,
+    "ADAPTIVE_RULES": 50,
+    "STATIC": 80
+   },
+   "by_risk": {
+    "1.0": 436,
+    "6.0": 133,
+    "4.0": 306,
+    "9.0": 337
+   },
+   "synth_share": 0.057755775577557754
+  },
+  "test_mad_ood": {
+   "n": 494,
+   "by_group": {
+    "benign": 324,
+    "failed": 153,
+    "hijacked": 17
+   },
+   "by_class": {
+    "benign": 324,
+    "resisted": 153,
+    "hijack": 17
+   },
+   "by_origin": {
+    "mad": 494
+   },
+   "by_source": {
+    "deepseek-v4.1-flash": 494
+   },
+   "by_config": {
+    "NONE": 494
+   },
+   "by_risk": {
+    "1.0": 324,
+    "4.0": 153,
+    "9.0": 17
+   },
+   "synth_share": 0.0
+  }
+ }
+}

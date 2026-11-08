@@ -329,3 +329,121 @@ def test_orchestrator_kill_dangling_sink(tmp_path):
         f.write_text(json.dumps(d))
     m = metrics.compute(runs, "mad", tmp_path / "res")["runs"]
     assert m["ADAPTIVE_RULES"]["m"]["killed_runs"] == 1 and m["NONE"]["m"]["killed_runs"] == 0  # NONE: cutoff
+
+
+# --- decider v3 sub-steps (PLAN §5 stages 6-7, §8a) ---
+
+def test_dry_run_lists_v3_substeps(tmp_path, monkeypatch, capsys):
+    from loop import loop as L
+    monkeypatch.setattr(L, "gate", lambda cmd: True)
+    monkeypatch.setattr(L.subprocess, "Popen", lambda *a, **k: (_ for _ in ()).throw(AssertionError("launched")))
+    monkeypatch.setattr(L.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError("ran")))
+    monkeypatch.setattr(L, "remaining_usd", lambda prov, runs: 9.5)
+    monkeypatch.delenv("SG_DECIDER_HOST", raising=False)
+    L.main(["--dry-run", "--iter", "2", "--runs", str(tmp_path / "runs"), "--loopdir", str(tmp_path / "loop")])
+    out = capsys.readouterr().out
+    for s in ("[harvest] FN/FP", "-m train.from_mad_runs", "--configs NONE STATIC ADAPTIVE_RULES", "rows_iter_2_mad.jsonl",
+              "[retrain/dataset] $", "-m train.merge_v3", "--extra train/rows_iter_2_fnfp.jsonl",
+              "[retrain/box] tag swarmguard-decider:v3", "ollama create swarmguard-decider:v3", "data_v3/train.jsonl",
+              "[retrain/calibrate] $", "--endpoint $SG_DECIDER_HOST", "--calibrate-from", "iter_2/risk_map.yaml"):
+        assert s in out, s
+    assert out.index("[harvest]") < out.index("[retrain/dataset]") < out.index("[retrain/box]") < out.index("[retrain/calibrate]")
+    assert not (tmp_path / "loop").exists()  # dry-run writes nothing
+
+
+def test_harvest_runs_mad_converter(tmp_path, monkeypatch):
+    from loop import harvest as H
+    runs, calls = fake_tree(tmp_path), []
+
+    def fake_run(cmd, cwd, check):
+        calls.append(cmd)
+        Path(cmd[cmd.index("--out") + 1]).write_text('{"row": {}, "cls": "benign"}\n')
+
+    monkeypatch.setattr(H.subprocess, "run", fake_run)
+    H.main(["--runs", str(runs), "--iter", "3", "--out-dir", str(tmp_path / "train"), "--mad-configs", "NONE", "STATIC"])
+    (cmd,) = calls
+    assert cmd[1:3] == ["-m", "train.from_mad_runs"] and cmd[cmd.index("--runs") + 1] == str(runs / "mad")
+    assert cmd[cmd.index("--configs") + 1: cmd.index("--out")] == ["NONE", "STATIC"]
+    assert cmd[cmd.index("--stats") + 1].endswith("rows_iter_3_mad.stats.json")
+    assert (tmp_path / "train/rows_iter_3_mad.jsonl").exists() and (tmp_path / "train/rows_iter_3.jsonl").exists()
+    calls.clear()  # no --mad-configs -> converter not called
+    H.main(["--runs", str(runs), "--iter", "4", "--out-dir", str(tmp_path / "train")])
+    assert calls == []
+
+
+def _retrain_args(tmp_path, sub=None):
+    return type("A", (), {"iter": 2, "train_dir": str(tmp_path / "train"), "results": str(tmp_path / "results"),
+                          "loopdir": str(tmp_path / "loop"), "runs": str(tmp_path / "runs"), "dry_run": False,
+                          "sub": sub})()
+
+
+def test_retrain_dataset_wraps_fnfp_and_merges(tmp_path, monkeypatch):
+    from loop import loop as L
+    td = tmp_path / "train"
+    td.mkdir()
+    (td / "data_v3").mkdir()
+    (td / "data_v3/synth_rows.jsonl").write_text("")
+    ev = Event(run_id="r", agent_id="a", step=0, kind=EventKind.TOOL_CALL, tool="send_money")
+    row = TrainRow(task="t", role={"task_id": "t", "tools": ["send_money"]}, window=[ev], source="mad:x",
+                   output={"risk": 9, "category": "prompt_injection", "first_bad_step": 0, "rationale": "r"})
+    (td / "rows_iter_1.jsonl").write_text(row.model_dump_json() + "\n")
+    (td / "rows_iter_1_mad.jsonl").write_text("not a TrainRow\n")  # converter output: not wrapped
+    cmds = []
+    monkeypatch.setattr(L, "sh", cmds.append)
+    L.stage_retrain(_retrain_args(tmp_path, "dataset"))
+    (cmd,) = cmds
+    assert cmd[1:3] == ["-m", "train.merge_v3"] and cmd[cmd.index("--mad") + 1] == str(td / "rows_iter_2_mad.jsonl")
+    assert cmd[cmd.index("--synth") + 1] == str(td / "data_v3/synth_rows.jsonl")
+    (line,) = (td / "rows_iter_2_fnfp.jsonl").read_text().splitlines()
+    w = json.loads(line)
+    assert w["cls"] == "hijacked" and TrainRow.model_validate(w["row"]).output.risk == 9
+
+
+def _eval_json(path, splits, risk_map, sweep):
+    path.write_text(json.dumps({"model": "swarmguard-decider:v3", "splits": splits,
+                                "calibration": {"risk_map": risk_map, "sweep": sweep}}))
+
+
+def test_calibrate_writes_risk_map_and_summary(tmp_path, monkeypatch):
+    from loop import loop as L, compare
+    a = _retrain_args(tmp_path, "calibrate")
+    res = tmp_path / "results"
+    res.mkdir()
+    monkeypatch.delenv("SG_DECIDER_HOST", raising=False)
+    cmds = []
+    monkeypatch.setattr(L, "sh", cmds.append)
+    L.stage_retrain(a)  # pending: not served, no eval JSON -> nothing written, nothing run
+    assert cmds == [] and not (tmp_path / "loop/iter_2/risk_map.yaml").exists()
+
+    sw = [{"cutoff": c / 2, "recall": 1.0, "fpr": max(0.0, 0.5 - c / 10)} for c in range(21)]
+    _eval_json(res / "decider_eval_v3_val.json", {}, [[0, 0], [2, 3.9], [5, 6.0], [7, 8.0], [10, 10]], sw)
+    _eval_json(res / "decider_eval_v3_test.json",
+               {"test_ood.jsonl": {"f1@risk>=8": 0.9, "fpr@95recall": 0.05},
+                "test_mad_ood.jsonl": {"f1@risk>=8": None, "sweep": sw}}, [], [])
+
+    class R:
+        returncode, stdout, stderr = 0, "  risk_map: [[0, 0], [10, 10]]\n", ""
+
+    monkeypatch.setattr(L.subprocess, "run", lambda cmd, **k: R)
+    monkeypatch.setenv("SG_DECIDER_HOST", "http://box:11434/v1")
+    L.stage_retrain(a)
+    assert cmds == []  # eval JSONs already exist -> not re-run
+    rm = (tmp_path / "loop/iter_2/risk_map.yaml").read_text()
+    assert "risk_map: [[0, 0], [10, 10]]" in rm and "bench/configs/ADAPTIVE.yaml" in rm and "v3" in rm
+    s = json.loads((res / "decider_eval.json").read_text())
+    assert s["attenuate_raw_cutoff"] == 5 and s["benign_fpr_attenuate"] == 0.0  # fpr at cutoff 5.0 on test_mad_ood
+    assert s["f1"] == 0.9 and s["test_mad_ood_f1"] is None
+    st = {t["id"]: t["status"] for t in compare.check({"decider": s}, compare.yaml.safe_load(
+        compare.TARGETS.read_text())["targets"])}
+    assert st["decider_f1"] == "PASS" and st["decider_fpr_attenuate"] == "PASS" and st["decider_mad_ood_f1"] == "MISSING"
+
+
+def test_calibrate_runs_eval_when_served(tmp_path, monkeypatch):
+    from loop import loop as L
+    monkeypatch.setenv("SG_DECIDER_HOST", "http://box:11434/v1")
+    cmds = []
+    monkeypatch.setattr(L, "sh", cmds.append)
+    L.stage_calibrate(_retrain_args(tmp_path))
+    assert len(cmds) == 2 and all(c[c.index("--endpoint") + 1] == "http://box:11434/v1" for c in cmds)
+    assert cmds[0][cmds[0].index("--model") + 1] == "swarmguard-decider:v3"
+    assert not (tmp_path / "loop/iter_2/risk_map.yaml").exists()  # sh mocked -> no val JSON -> pending

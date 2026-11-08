@@ -31,9 +31,24 @@ lanes:
     - {model: openai/gpt-4.1, configs: [ADAPTIVE], suites: [workspace, banking], attacks: [none]}
     - {model: openai/gpt-4.1, configs: [ADAPTIVE], suites: [workspace], attacks: [important_instructions], max_episodes: 100}
     - {model: openai/gpt-4.1, configs: [STATIC], suites: [workspace, banking], attacks: [none], only_if_remaining_usd_gt: 3}
-# retrain runs on the Linux box (C8, train/README.md); executed by the orchestrator over pc-compute, after
-# merging train/rows_iter_*.jsonl into the box's data_v2 split and syncing it to ~/swarmguard-train
-retrain_cmd: >-
-  cd ~/swarmguard-train && export PATH=$HOME/.local/bin:$PATH && . .venv/bin/activate &&
-  nohup python train_lora.py --base Qwen/Qwen3-4B-Instruct-2507 --rows data_v2/train.jsonl --val data_v2/val.jsonl
-  --out out/decider_v2 > train_v2_iter{iter}.log 2>&1 &
+# stage 6 harvest: FN/FP windows + train.from_mad_runs over these configs -> train/rows_iter_N_mad.jsonl (PLAN §8a item 1)
+harvest:
+  mad_configs: [NONE, STATIC, ADAPTIVE_RULES]
+# stage 7 retrain (decider v3, PLAN §8a): dataset = train.merge_v3 (v2 + harvested + synth) on the Mac; box steps =
+# train/data_v3/BOX_COMMANDS.md a-c (push, train, export), printed with the new tag and executed by the orchestrator over ssh (C8);
+# calibrate = train/eval.py on val (+ held-out tests) against $SG_DECIDER_HOST -> loop/iter_N/risk_map.yaml.
+decider:
+  version: 2                          # tag served now (swarmguard-decider:v2); retrain builds v{version+1}.
+                                      # Orchestrator bumps this once the new tag is served + calibrated.
+  host_env: SG_DECIDER_HOST           # env var holding the served decider endpoint (http://<box>:11434/v1)
+  base: ninty-seven/StepGuard         # decided C20 (PLAN §8a item 4, BOX_COMMANDS.md b); fallback Qwen/Qwen3-4B-Instruct-2507 if it fails to load / breaks ChatML
+  box_commands: train/data_v3/BOX_COMMANDS.md
+synth:                                # teacher rows (train/synth_teacher.py, Command Code); the loop never calls the teacher
+  enabled: true
+  budget_usd: 1
+  rows: data_v3/synth_rows.jsonl      # relative to --train-dir
+calibration:
+  # ponytail: documents train/eval.py's hard-coded calibration (FPR <= 2% -> risk 6.0 ATTENUATE, <= 1% -> 8.0 KILL)
+  fpr_targets: {attenuate: 0.02, kill: 0.01}
+  val_limit: 0                        # 0 = whole val split
+  test_limit: 300                     # rows per held-out split (stride sample)

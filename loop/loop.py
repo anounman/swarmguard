@@ -1,6 +1,11 @@
 """The loop (PLAN §5): build -> smoke -> bench -> metrics -> compare -> harvest -> (retrain) -> sync.
 
-  python -m loop.loop --stage build|smoke|bench|metrics|compare|harvest|retrain|sync|all --iter N [--dry-run]
+  python -m loop.loop [--stage build|smoke|bench|metrics|compare|harvest|retrain|sync|all] --iter N [--dry-run]
+      [--sub dataset|box|calibrate]   (retrain only: run one sub-step; `make calibrate` = --sub calibrate)
+harvest = FN/FP windows (loop/harvest.py) + train.from_mad_runs over config `harvest.mad_configs` -> rows_iter_N_mad.jsonl.
+retrain (decider v3, PLAN §8a) = dataset (train.merge_v3: v2 + harvested + synth) -> box (print BOX_COMMANDS.md a-c with
+tag swarmguard-decider:v{decider.version+1}; the orchestrator executes them) -> calibrate (train/eval.py on val + tests
+against $SG_DECIDER_HOST, --calibrate-from -> loop/iter_N/risk_map.yaml + results/decider_eval.json summary).
 Each iteration writes loop/iter_N/{metrics.json,diff.md}. `all` stops when every target PASSes or past the
 deadline in loop/config.yaml. Bench/smoke shell out to bench/run.py, one process per suite:
   uv run python bench/run.py --bench mad --config X --model M --suite S --attack A --logdir D [--key K] [--n N]
@@ -13,7 +18,9 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -195,19 +202,127 @@ def stage_compare(a) -> bool:
 
 
 def stage_harvest(a) -> None:
-    harvest.main(["--runs", a.runs, "--bench", CFG["bench"], "--iter", str(a.iter), "--out-dir", a.train_dir])
+    mad = CFG["harvest"]["mad_configs"]
+    if a.dry_run:
+        log(f"[harvest] FN/FP windows -> {a.train_dir}/rows_iter_{a.iter}.jsonl")
+        log("[harvest] $", " ".join(harvest.mad_cmd(a.runs, CFG["bench"], mad, a.train_dir, a.iter)))
+        return
+    try:
+        harvest.main(["--runs", a.runs, "--bench", CFG["bench"], "--iter", str(a.iter), "--out-dir", a.train_dir,
+                      "--mad-configs", *mad])
+    except subprocess.CalledProcessError as e:
+        raise StageFailed(f"train.from_mad_runs: {e}") from e
+
+
+def new_version() -> int:
+    """decider.version = the tag served now; retrain builds the next one (orchestrator bumps the config once served)."""
+    return CFG["decider"]["version"] + 1
+
+
+def merge_cmd(a) -> list[str]:
+    td = Path(a.train_dir)
+    synth = str(td / CFG["synth"]["rows"]) if CFG["synth"]["enabled"] else os.devnull
+    return [sys.executable, "-m", "train.merge_v3", "--v2", str(td / "data"),
+            "--mad", str(td / f"rows_iter_{a.iter}_mad.jsonl"), "--synth", synth,
+            "--extra", str(td / f"rows_iter_{a.iter}_fnfp.jsonl"), "--out", str(td / "data_v3")]
+
+
+def box_commands(n: int) -> str:
+    """BOX_COMMANDS.md steps a-c (push, train, export; bash blocks) with the v3 tag/paths bumped to v{n}. Steps d-e
+    (eval, calibration) are the calibrate sub-step. data_v3/ is the dataset dir and stays."""
+    txt = (ROOT / CFG["decider"]["box_commands"]).read_text().split("## a.", 1)[1].split("## d.", 1)[0]
+    blocks = re.findall(r"```bash\n(.*?)```", txt, re.S)
+    # ponytail: textual bump of the doc's v3 names (decider_v3, :v3, train_v3.log, ..._v3_val.json); data_v3 stays
+    return re.sub(r"(?<!data_)v3(?=\b|_)", f"v{n}", "\n".join(blocks))
+
+
+def eval_cmds(a, n: int) -> dict[Path, list[str]]:
+    td, res, c = Path(a.train_dir), Path(a.results), CFG["calibration"]
+    host = os.environ.get(CFG["decider"]["host_env"]) or f"${CFG['decider']['host_env']}"
+    base = [sys.executable, "train/eval.py", "--endpoint", host, "--model", f"swarmguard-decider:v{n}"]
+    val, test = res / f"decider_eval_v{n}_val.json", res / f"decider_eval_v{n}_test.json"
+    return {val: base + ["--splits", str(td / "data_v3/val.jsonl"), "--limit", str(c["val_limit"]), "--out", str(val)],
+            test: base + ["--splits", str(td / "data/test_ood.jsonl"), str(td / "data/test_drift.jsonl"),
+                          str(td / "data_v3/test_mad_ood.jsonl"), "--limit", str(c["test_limit"]), "--out", str(test)]}
+
+
+def attenuate_raw(knots: list) -> float:
+    """Raw decider risk the risk_map sends to 6.0 (action_for: 6 = ATTENUATE)."""
+    for (x0, y0), (x1, y1) in zip(knots, knots[1:]):
+        if y0 < 6.0 <= y1:
+            return x0 + (6.0 - y0) * (x1 - x0) / (y1 - y0)
+    return 10.0
+
+
+def decider_summary(val: dict, test: dict | None) -> dict:
+    """Flat keys for the decider.* targets (loop/targets.yaml); metrics.py loads results/decider_eval.json as `decider`.
+    FPR at the ATTENUATE boundary is measured on held-out test_mad_ood (falls back to val) at the val-calibrated cutoff."""
+    sp = (test or {}).get("splits", {})
+    ood = sp.get("test_ood.jsonl", {})
+    x6 = attenuate_raw(val["calibration"]["risk_map"])
+    sw = sp.get("test_mad_ood.jsonl", {}).get("sweep") or val["calibration"]["sweep"]
+    fpr = next((r["fpr"] for r in sw if r["cutoff"] >= x6), None)
+    return {"f1": ood.get("f1@risk>=8"), "fpr_at_95_recall": ood.get("fpr@95recall"),
+            "test_mad_ood_f1": sp.get("test_mad_ood.jsonl", {}).get("f1@risk>=8"),
+            "benign_fpr_attenuate": None if fpr is None else round(100 * fpr, 2), "attenuate_raw_cutoff": x6,
+            "model": val.get("model"), "calibration": val["calibration"], "splits": sp}
+
+
+def stage_calibrate(a) -> None:
+    """retrain sub-step: eval the new decider on val (+ held-out tests), write loop/iter_N/risk_map.yaml. The
+    orchestrator copies that line into the monitor block of bench/configs/ADAPTIVE.yaml + ADAPTIVE_AUDIT.yaml (+ host_model) before the next bench."""
+    n = new_version()
+    cmds = eval_cmds(a, n)
+    served = bool(os.environ.get(CFG["decider"]["host_env"]))
+    for out, cmd in cmds.items():
+        if a.dry_run or (not out.exists() and not served):
+            log("[retrain/calibrate] $", " ".join(cmd))
+        elif not out.exists():
+            sh(cmd)
+    val, test = list(cmds)
+    if a.dry_run or not val.exists():
+        log(f"[retrain/calibrate] {'plan' if a.dry_run else 'PENDING (decider not served / no val eval)'}: "
+            f"$ {sys.executable} train/eval.py --calibrate-from {val} > {iter_dir(a) / 'risk_map.yaml'}; "
+            f"then copy it into bench/configs/ADAPTIVE.yaml + ADAPTIVE_AUDIT.yaml (monitor block) + host_model: swarmguard-decider:v{n}")
+        return
+    r = subprocess.run([sys.executable, "train/eval.py", "--calibrate-from", str(val)], cwd=ROOT, capture_output=True,
+                       text=True)
+    if r.returncode != 0:
+        raise StageFailed(f"eval.py --calibrate-from: {r.stderr.strip()[-300:]}")
+    it = iter_dir(a)
+    it.mkdir(parents=True, exist_ok=True)
+    (it / "risk_map.yaml").write_text(
+        f"# swarmguard-decider:v{n}, calibrated on {val} (fpr targets {CFG['calibration']['fpr_targets']}).\n"
+        f"# Orchestrator: paste over `risk_map:` in bench/configs/ADAPTIVE.yaml + ADAPTIVE_AUDIT.yaml (monitor block), set\n"
+        f"# host_model: swarmguard-decider:v{n}, bump loop/config.yaml decider.version to {n}, then bench.\n"
+        + r.stdout)
+    summ = decider_summary(json.loads(val.read_text()), json.loads(test.read_text()) if test.exists() else None)
+    (Path(a.results) / "decider_eval.json").write_text(json.dumps(summ, indent=1))
+    log(f"[retrain/calibrate] -> {it / 'risk_map.yaml'}  benign FPR@ATTENUATE={summ['benign_fpr_attenuate']}%")
 
 
 def stage_retrain(a) -> None:
-    """Only if decider targets failed. Runs on the Linux box (C8); orchestrator executes it via pc-compute."""
-    cmd = CFG["retrain_cmd"].format(iter=a.iter)
-    if not (ROOT / "train/train_lora.py").exists():
-        print(f"[retrain] SKIP: train/train_lora.py not ready (S3). When ready, on the box run:\n  {cmd}")
-        return
-    print(f"[retrain] convert train/rows_iter_*.jsonl into the box's data_v2 split (train/README.md), scp to "
-          f"~/swarmguard-train, then run on the box:\n  {cmd}\n"
-          f"  then: bash export.sh out/decider_v2/merged && ollama create swarmguard-decider:v{a.iter} -f Modelfile "
-          f"(back to bench, ADAPTIVE only; add ADAPTIVE to smoke.configs)")
+    """Only if decider targets failed. Sub-steps: dataset (Mac) -> box (printed; orchestrator runs them on the Linux
+    box, C8) -> calibrate (needs the new tag served at $SG_DECIDER_HOST; else prints what to run)."""
+    sub, n = getattr(a, "sub", None), new_version()
+    if sub in (None, "dataset"):
+        td = Path(a.train_dir)
+        if CFG["synth"]["enabled"] and not (td / CFG["synth"]["rows"]).exists():
+            log(f"[retrain/dataset] synth rows missing; teacher (Command Code, <= ${CFG['synth']['budget_usd']}): "
+                f"uv run python -m train.synth_teacher --out {td / 'data_v3'} --max-usd {CFG['synth']['budget_usd']}")
+        cmd = merge_cmd(a)
+        if a.dry_run:
+            log(f"[retrain/dataset] wrap {td}/rows_iter_*.jsonl (FN/FP) -> {cmd[cmd.index('--extra') + 1]}")
+            log("[retrain/dataset] $", " ".join(cmd))
+        else:
+            fnfp = sorted(p for p in td.glob("rows_iter_*.jsonl") if re.fullmatch(r"rows_iter_\d+\.jsonl", p.name))
+            harvest.wrap_for_merge(fnfp, Path(cmd[cmd.index("--extra") + 1]))
+            sh(cmd)
+    if sub in (None, "box"):
+        log(f"[retrain/box] tag swarmguard-decider:v{n} (v{n - 1} stays served); orchestrator runs on the box "
+            f"({CFG['decider']['box_commands']}, base {CFG['decider']['base']}):\n{box_commands(n)}")
+    if sub in (None, "calibrate"):
+        stage_calibrate(a)
 
 
 def stage_sync(a, note: str = "") -> None:
@@ -246,6 +361,11 @@ def run_all(a) -> None:
     if a.dry_run:
         stage_smoke(a)
         stage_bench(a)
+        log("[metrics] -> results/metrics.json + iter metrics.json; [compare] vs loop/targets.yaml")
+        stage_harvest(a)
+        log("[retrain] (only if decider targets fail) sub-steps: dataset -> box -> calibrate")
+        stage_retrain(a)
+        log("[sync] PROGRESS.md entry by the orchestrator (C10)")
         return
     stage_build(a)
     stage_smoke(a)
@@ -273,7 +393,8 @@ STAGES = {"build": stage_build, "smoke": stage_smoke, "bench": stage_bench, "met
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stage", required=True, choices=list(STAGES))
+    ap.add_argument("--stage", default="all", choices=list(STAGES))
+    ap.add_argument("--sub", choices=["dataset", "box", "calibrate"], help="retrain: run one sub-step only")
     ap.add_argument("--iter", type=int, default=0)
     ap.add_argument("--runs", default="runs")
     ap.add_argument("--results", default="results")

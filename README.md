@@ -72,7 +72,7 @@ One cell by hand:
 uv run python bench/run.py --bench mad --config STATIC --model gpt-oss:120b --suite workspace --attack important_instructions --key A
 ```
 
-Use the trained decider: `ollama create swarmguard-decider -f train/Modelfile`, then `export SG_DECIDER_HOST=http://<host>:11434/v1`. Without it, `ADAPTIVE` falls back to a cloud stand-in and says so in the logs.
+Use the trained decider: `ollama create swarmguard-decider:v3 -f train/Modelfile` (tagged so versions sit side by side), then `export SG_DECIDER_HOST=http://<host>:11434/v1`. Without it, `ADAPTIVE` falls back to a cloud stand-in and says so in the logs. Decider versions: **v2** = Qwen3-4B-Instruct-2507 QLoRA on public AgentDojo + AgentDrift rows (task-disjoint); **v3** = QLoRA from `ninty-seven/StepGuard` on v2 + our own MultiAgentDojo windows + ≈600 teacher-synthesised marker-free rows, calibrated with a `risk_map` (`make calibrate`). Both are reported; StepGuard and NVIDIA injection rows are converted but held for v4.
 
 ## Using `sg` in your own harness
 
@@ -92,12 +92,12 @@ Replace your tool executor with `GuardedToolsExecutor(gw, token, task_text)` and
 
 ## Providers and budget
 
-Three OpenAI-compatible providers, each model pinned to one: Ollama Cloud (gpt-oss tiers), Command Code (deepseek-v4.1-flash), OpenRouter (gpt-4.1 anchor). `budget.yaml` is the law: caps, reserves, Command Code's $20/5 h and $50/7 d windows, allowed models. `bench/run.py --dry-run` prints the gate decision; spend is appended per run to `runs/mad/spend.jsonl` and summarised in `results/spend.json`. Keys are read from the environment first and from `~/.zshrc` as fallback.
+Four OpenAI-compatible providers, each model pinned to one: Ollama Cloud (gpt-oss tiers), Command Code (deepseek-v4.1-flash, `moonshotai/Kimi-K3.1-Pro`), OpenRouter (gpt-4.1 anchor), Anthropic via its OpenAI-compat endpoint `https://api.anthropic.com/v1` (claude-sonnet-5-5 / claude-opus-5-5 strong-model anchor; `strict` ignored, no caching). A missing provider key makes the gate print `GATE REFUSE … rc 2`, so `bench/supervise.py <cells.txt>` simply waits for the key. `budget.yaml` is the law: caps, reserves, Command Code's $20/5 h and $50/7 d windows, allowed models. `bench/run.py --dry-run` prints the gate decision; spend is appended per run to `runs/mad/spend.jsonl` and summarised in `results/spend.json`. Keys are read from the environment first and from `~/.zshrc` as fallback.
 
 ## Honesty notes
 
 - Every external number is marked *reported, not replicated*; comparisons are made only on the shared benchmark, and where the model differs we compare utility retention rather than absolute utility.
-- One seed. The decider's training data is partly synthetic; v3 includes trajectories from the same task suites we benchmark on (different models) and is reported separately from v2.
+- One seed. The decider's training data is partly synthetic; v3 includes trajectories from the same task suites we benchmark on (different models; deepseek-v4.1-flash held out as `test_mad_ood`) and is reported separately from v2. The synth teacher is that same held-out model, so `test_mad_ood` is out-of-distribution in the agent, not in the teacher's style.
 - The STATIC taint rule arms on injection markers; adaptive attackers are out of scope tonight (see Limitations and Dual-Use in the report).
 - `runs/mad/NONE/gpt-4.1/` is a partial undefended gpt-4.1 baseline, reported as partial.
 

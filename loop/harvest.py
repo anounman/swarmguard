@@ -4,16 +4,21 @@ FN = injection succeeded (security True) under STATIC / ADAPTIVE*  -> window end
 FP = benign run (attack none) with a DENY event                    -> window ending at the denied step, risk 1.
 Window = last <=8 events. Events come from <model_dir>/**/events*.jsonl when they carry run keys in meta
 (suite / user_task_id / injection_task_id); else the window is rebuilt from the log's messages.
+v3 (PLAN §8a item 1): with --mad-configs, also run train/from_mad_runs.py (same CLI, logic stays there) over
+<runs>/<bench> -> rows_iter_N_mad.jsonl (+ .stats.json). `wrap_for_merge` turns FN/FP rows into merge_v3 --extra lines.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 from sg.schema import Event, EventKind, Role, TrainRow, Verdict
 from loop.metrics import load_events, load_runs, is_benign_event
 
+ROOT = Path(__file__).resolve().parents[1]
 GUARDED = ("STATIC", "ADAPTIVE")  # prefix match: STATIC, ADAPTIVE_RULES, ADAPTIVE, ADAPTIVE_AUDIT
 W = 8
 
@@ -116,12 +121,39 @@ def harvest(runs_root: Path, bench: str = "mad") -> list[TrainRow]:
     return rows
 
 
+def mad_cmd(runs: str, bench: str, configs: list[str], out_dir: str, it: int) -> list[str]:
+    out = Path(out_dir) / f"rows_iter_{it}_mad.jsonl"
+    return [sys.executable, "-m", "train.from_mad_runs", "--runs", str(Path(runs) / bench), "--configs", *configs,
+            "--out", str(out), "--stats", str(out.with_suffix(".stats.json"))]
+
+
+def mad_rows(runs: str, bench: str, configs: list[str], out_dir: str, it: int) -> Path:
+    cmd = mad_cmd(runs, bench, configs, out_dir, it)
+    print("$", " ".join(cmd), flush=True)
+    subprocess.run(cmd, cwd=ROOT, check=True)
+    return Path(cmd[cmd.index("--out") + 1])
+
+
+def wrap_for_merge(srcs: list[Path], dst: Path) -> int:
+    """FN/FP TrainRow lines -> {row, cls} lines that train/merge_v3.py --extra reads."""
+    n = 0
+    with dst.open("w") as f:
+        for p in srcs:
+            for line in p.read_text().splitlines():
+                r = json.loads(line)
+                f.write(json.dumps({"row": r, "cls": "hijacked" if r["output"]["risk"] >= 8 else "benign",
+                                    "pipeline": r.get("source")}) + "\n")
+                n += 1
+    return n
+
+
 def main(argv: list[str] | None = None) -> Path:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", default="runs")
     ap.add_argument("--bench", default="mad")
     ap.add_argument("--iter", type=int, required=True)
     ap.add_argument("--out-dir", default="train")
+    ap.add_argument("--mad-configs", nargs="*", default=[], help="also run train.from_mad_runs over these configs")
     a = ap.parse_args(argv)
     rows = harvest(Path(a.runs), a.bench)
     out = Path(a.out_dir) / f"rows_iter_{a.iter}.jsonl"
@@ -129,6 +161,8 @@ def main(argv: list[str] | None = None) -> Path:
     out.write_text("".join(r.model_dump_json() + "\n" for r in rows))
     fn = sum(r.output.risk >= 8 for r in rows)
     print(f"harvest -> {out}  rows={len(rows)} FN={fn} FP={len(rows) - fn}")
+    if a.mad_configs:
+        mad_rows(a.runs, a.bench, a.mad_configs, a.out_dir, a.iter)
     return out
 
 
