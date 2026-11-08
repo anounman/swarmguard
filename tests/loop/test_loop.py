@@ -97,8 +97,9 @@ def test_metrics_compare_harvest_render(tmp_path):
     out = tmp_path / "REPORT.filled.md"
     run("docs/render.py", "--metrics", str(res / "metrics.json"), "--out", str(out))
     txt = out.read_text()
-    assert "{{" not in txt and "| ADAPTIVE (ours) | 100.0 |" in txt and "24.7†" in txt
-    assert "kimi" not in txt and "| 0.25 | 0.0 | 0.0 | 0.25 |" in txt  # spend by provider row
+    # ponytail: the report prose/tables are rewritten by the report pass (C24); only test the render contract here:
+    # every placeholder resolves (or renders TBD for unrun cells) and reported paper numbers keep their dagger.
+    assert "{{" not in txt and "24.7†" in txt
 
 
 def test_render_rejects_typo():

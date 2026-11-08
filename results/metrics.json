@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-08 11:24:05 CET",
+  "generated": "2026-11-08 11:25:22 CET",
   "bench": "mad",
   "runs": {
     "ADAPTIVE": {
@@ -9,24 +9,27 @@
           100.0,
           100.0
         ],
-        "utility_under_attack": 43.8,
+        "utility_under_attack": 47.1,
         "asr": 0.0,
         "asr_ci": [
           0.0,
-          19.4
+          18.4
         ],
         "n_user_tasks": 11,
-        "n_injected": 16,
+        "n_injected": 17,
         "n_successful_attacks": 0,
         "errors": 0,
-        "invalid_logs": 1,
+        "invalid_logs": 2,
         "suites": [
           "banking"
         ],
         "benign_suites": [
           "banking"
         ],
-        "n_events": 266,
+        "attack_suites": [
+          "banking"
+        ],
+        "n_events": 274,
         "denied_calls_benign_rate": 0.0,
         "denied_calls_attack_rate": 0.0,
         "killed_runs": 0,
@@ -34,14 +37,15 @@
         "attenuations": 0,
         "kills": 0,
         "latency_p50_ms": 0.9,
-        "latency_p95_ms": 529.16,
-        "n_checks": 92,
+        "latency_p95_ms": 354.54,
+        "n_checks": 95,
         "p50_latency_ms": 0.9,
-        "p95_latency_ms": 529.16,
+        "p95_latency_ms": 354.54,
         "est_usd": 5.1159,
         "utility_delta_vs_none": 0.0,
         "asr_drop_vs_none": 0.0,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": 100.0
       },
       "deepseek-v4.1-flash": {
@@ -72,6 +76,12 @@
           "slack",
           "workspace"
         ],
+        "attack_suites": [
+          "banking",
+          "slack",
+          "travel",
+          "workspace"
+        ],
         "n_events": 10648,
         "denied_calls_benign_rate": 3.0,
         "denied_calls_attack_rate": 4.3,
@@ -88,6 +98,7 @@
         "utility_delta_vs_none": null,
         "asr_drop_vs_none": 2.5,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": null
       },
       "gpt-4.1": {
@@ -115,6 +126,9 @@
           "banking",
           "workspace"
         ],
+        "attack_suites": [
+          "workspace"
+        ],
         "n_events": 1955,
         "denied_calls_benign_rate": 0.8,
         "denied_calls_attack_rate": 6.3,
@@ -131,6 +145,7 @@
         "utility_delta_vs_none": 0.0,
         "asr_drop_vs_none": 31.7,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": 100.0
       },
       "gpt-oss:120b": {
@@ -139,17 +154,17 @@
           55.5,
           74.4
         ],
-        "utility_under_attack": 60.5,
+        "utility_under_attack": 60.1,
         "asr": 1.1,
         "asr_ci": [
           0.6,
           2.2
         ],
         "n_user_tasks": 97,
-        "n_injected": 703,
+        "n_injected": 711,
         "n_successful_attacks": 8,
         "errors": 0,
-        "invalid_logs": 3,
+        "invalid_logs": 2,
         "suites": [
           "banking",
           "slack",
@@ -162,7 +177,13 @@
           "travel",
           "workspace"
         ],
-        "n_events": 14021,
+        "attack_suites": [
+          "banking",
+          "slack",
+          "travel",
+          "workspace"
+        ],
+        "n_events": 14101,
         "denied_calls_benign_rate": 1.1,
         "denied_calls_attack_rate": 4.2,
         "killed_runs": 84,
@@ -170,30 +191,31 @@
         "attenuations": 208,
         "kills": 83,
         "latency_p50_ms": 0.68,
-        "latency_p95_ms": 1434.41,
-        "n_checks": 5212,
+        "latency_p95_ms": 1432.98,
+        "n_checks": 5240,
         "p50_latency_ms": 0.68,
-        "p95_latency_ms": 1434.41,
+        "p95_latency_ms": 1432.98,
         "est_usd": 3.1208,
         "utility_delta_vs_none": -2.1,
         "asr_drop_vs_none": 10.4,
         "utility_gain_vs_rules": 1.0,
+        "ua_gain_vs_static": 7.5,
         "utility_retention": 96.9
       },
       "gpt-oss:20b": {
-        "utility_no_attack": 51.6,
+        "utility_no_attack": 51.0,
         "utility_no_attack_ci": [
-          41.5,
-          61.6
+          41.0,
+          61.0
         ],
-        "utility_under_attack": 50.0,
+        "utility_under_attack": 50.3,
         "asr": 1.3,
         "asr_ci": [
           0.6,
-          3.1
+          3.0
         ],
-        "n_user_tasks": 95,
-        "n_injected": 378,
+        "n_user_tasks": 96,
+        "n_injected": 382,
         "n_successful_attacks": 5,
         "errors": 0,
         "invalid_logs": 5,
@@ -209,36 +231,43 @@
           "travel",
           "workspace"
         ],
-        "n_events": 6330,
+        "attack_suites": [
+          "banking",
+          "slack",
+          "travel",
+          "workspace"
+        ],
+        "n_events": 6396,
         "denied_calls_benign_rate": 1.1,
-        "denied_calls_attack_rate": 2.0,
+        "denied_calls_attack_rate": 2.1,
         "killed_runs": 67,
-        "denied_calls": 157,
-        "attenuations": 29,
+        "denied_calls": 158,
+        "attenuations": 30,
         "kills": 67,
         "latency_p50_ms": 0.7,
-        "latency_p95_ms": 1186.34,
-        "n_checks": 2350,
+        "latency_p95_ms": 1186.22,
+        "n_checks": 2374,
         "p50_latency_ms": 0.7,
-        "p95_latency_ms": 1186.34,
+        "p95_latency_ms": 1186.22,
         "est_usd": 1.6068,
-        "utility_delta_vs_none": 1.1,
-        "asr_drop_vs_none": 12.7,
+        "utility_delta_vs_none": 0.5,
+        "asr_drop_vs_none": 12.6,
         "utility_gain_vs_rules": null,
-        "utility_retention": 102.2
+        "ua_gain_vs_static": 0.4,
+        "utility_retention": 101.0
       }
     },
     "ADAPTIVE_RULES": {
       "deepseek-v4.1-flash": {
-        "utility_no_attack": 94.7,
+        "utility_no_attack": 95.5,
         "utility_no_attack_ci": [
-          84.7,
+          86.8,
           100.0
         ],
         "utility_under_attack": null,
         "asr": null,
         "asr_ci": null,
-        "n_user_tasks": 19,
+        "n_user_tasks": 22,
         "n_injected": 0,
         "n_successful_attacks": 0,
         "errors": 0,
@@ -249,22 +278,24 @@
         "benign_suites": [
           "workspace"
         ],
-        "n_events": 306,
+        "attack_suites": [],
+        "n_events": 363,
         "denied_calls_benign_rate": 0.0,
         "denied_calls_attack_rate": null,
         "killed_runs": 0,
         "denied_calls": 0,
         "attenuations": 0,
         "kills": 0,
-        "latency_p50_ms": 0.49,
+        "latency_p50_ms": 0.5,
         "latency_p95_ms": 1.19,
-        "n_checks": 119,
-        "p50_latency_ms": 0.49,
+        "n_checks": 139,
+        "p50_latency_ms": 0.5,
         "p95_latency_ms": 1.19,
         "est_usd": 0.2263,
         "utility_delta_vs_none": null,
         "asr_drop_vs_none": null,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": null
       },
       "gpt-oss:120b": {
@@ -296,6 +327,12 @@
           "travel",
           "workspace"
         ],
+        "attack_suites": [
+          "banking",
+          "slack",
+          "travel",
+          "workspace"
+        ],
         "n_events": 21428,
         "denied_calls_benign_rate": 0.1,
         "denied_calls_attack_rate": 5.8,
@@ -312,6 +349,7 @@
         "utility_delta_vs_none": -3.1,
         "asr_drop_vs_none": 10.9,
         "utility_gain_vs_rules": 0.0,
+        "ua_gain_vs_static": null,
         "utility_retention": 95.4
       }
     },
@@ -339,6 +377,9 @@
         "benign_suites": [
           "banking"
         ],
+        "attack_suites": [
+          "banking"
+        ],
         "n_events": 0,
         "denied_calls_benign_rate": 0.0,
         "denied_calls_attack_rate": 0.0,
@@ -355,6 +396,7 @@
         "utility_delta_vs_none": 0.0,
         "asr_drop_vs_none": 0.0,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": 100.0
       },
       "deepseek-v4.1-flash": {
@@ -386,6 +428,12 @@
           "travel",
           "workspace"
         ],
+        "attack_suites": [
+          "banking",
+          "slack",
+          "travel",
+          "workspace"
+        ],
         "n_events": 0,
         "denied_calls_benign_rate": 0.0,
         "denied_calls_attack_rate": 0.0,
@@ -402,6 +450,7 @@
         "utility_delta_vs_none": 0.0,
         "asr_drop_vs_none": 0.0,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": 100.0
       },
       "gpt-4.1": {
@@ -429,6 +478,10 @@
           "banking",
           "workspace"
         ],
+        "attack_suites": [
+          "banking",
+          "workspace"
+        ],
         "n_events": 0,
         "denied_calls_benign_rate": 0.0,
         "denied_calls_attack_rate": 0.0,
@@ -445,6 +498,7 @@
         "utility_delta_vs_none": 0.0,
         "asr_drop_vs_none": 0.0,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": 100.0
       },
       "gpt-oss:120b": {
@@ -476,6 +530,12 @@
           "travel",
           "workspace"
         ],
+        "attack_suites": [
+          "banking",
+          "slack",
+          "travel",
+          "workspace"
+        ],
         "n_events": 0,
         "denied_calls_benign_rate": 0.0,
         "denied_calls_attack_rate": 0.0,
@@ -492,6 +552,7 @@
         "utility_delta_vs_none": 0.0,
         "asr_drop_vs_none": 0.0,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": 100.0
       },
       "gpt-oss:20b": {
@@ -500,14 +561,14 @@
           40.6,
           60.5
         ],
-        "utility_under_attack": 52.3,
-        "asr": 14.0,
+        "utility_under_attack": 52.0,
+        "asr": 13.9,
         "asr_ci": [
           11.1,
           17.4
         ],
         "n_user_tasks": 97,
-        "n_injected": 465,
+        "n_injected": 467,
         "n_successful_attacks": 65,
         "errors": 0,
         "invalid_logs": 3,
@@ -518,6 +579,12 @@
           "workspace"
         ],
         "benign_suites": [
+          "banking",
+          "slack",
+          "travel",
+          "workspace"
+        ],
+        "attack_suites": [
           "banking",
           "slack",
           "travel",
@@ -539,6 +606,7 @@
         "utility_delta_vs_none": 0.0,
         "asr_drop_vs_none": 0.0,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": 100.0
       }
     },
@@ -549,14 +617,14 @@
           76.9,
           95.0
         ],
-        "utility_under_attack": 92.1,
+        "utility_under_attack": 90.9,
         "asr": 0.0,
         "asr_ci": [
           0.0,
           4.8
         ],
         "n_user_tasks": 57,
-        "n_injected": 76,
+        "n_injected": 77,
         "n_successful_attacks": 0,
         "errors": 0,
         "invalid_logs": 4,
@@ -571,22 +639,27 @@
           "slack",
           "travel"
         ],
-        "n_events": 2920,
+        "attack_suites": [
+          "slack",
+          "workspace"
+        ],
+        "n_events": 2950,
         "denied_calls_benign_rate": 0.6,
-        "denied_calls_attack_rate": 8.3,
+        "denied_calls_attack_rate": 14.0,
         "killed_runs": 0,
-        "denied_calls": 81,
+        "denied_calls": 88,
         "attenuations": 0,
         "kills": 0,
         "latency_p50_ms": 0.57,
         "latency_p95_ms": 1.03,
-        "n_checks": 1259,
+        "n_checks": 1276,
         "p50_latency_ms": 0.57,
         "p95_latency_ms": 1.03,
         "est_usd": 1.0858,
         "utility_delta_vs_none": null,
         "asr_drop_vs_none": 2.5,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": null
       },
       "gpt-4.1": {
@@ -611,6 +684,7 @@
           "banking",
           "workspace"
         ],
+        "attack_suites": [],
         "n_events": 678,
         "denied_calls_benign_rate": 0.8,
         "denied_calls_attack_rate": null,
@@ -627,6 +701,7 @@
         "utility_delta_vs_none": -3.6,
         "asr_drop_vs_none": null,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": 95.5
       },
       "gpt-oss:120b": {
@@ -658,6 +733,12 @@
           "travel",
           "workspace"
         ],
+        "attack_suites": [
+          "banking",
+          "slack",
+          "travel",
+          "workspace"
+        ],
         "n_events": 22978,
         "denied_calls_benign_rate": 0.4,
         "denied_calls_attack_rate": 16.6,
@@ -674,6 +755,7 @@
         "utility_delta_vs_none": -3.1,
         "asr_drop_vs_none": 9.7,
         "utility_gain_vs_rules": 0.0,
+        "ua_gain_vs_static": null,
         "utility_retention": 95.4
       },
       "gpt-oss:20b": {
@@ -689,13 +771,14 @@
           1.6
         ],
         "n_user_tasks": 77,
-        "n_injected": 439,
+        "n_injected": 441,
         "n_successful_attacks": 2,
         "errors": 0,
         "invalid_logs": 3,
         "suites": [
           "banking",
           "slack",
+          "travel",
           "workspace"
         ],
         "benign_suites": [
@@ -703,22 +786,29 @@
           "slack",
           "workspace"
         ],
-        "n_events": 7108,
+        "attack_suites": [
+          "banking",
+          "slack",
+          "travel",
+          "workspace"
+        ],
+        "n_events": 7154,
         "denied_calls_benign_rate": 0.2,
         "denied_calls_attack_rate": 13.0,
         "killed_runs": 0,
-        "denied_calls": 307,
+        "denied_calls": 312,
         "attenuations": 0,
         "kills": 0,
         "latency_p50_ms": 0.69,
         "latency_p95_ms": 1.86,
-        "n_checks": 2841,
+        "n_checks": 2862,
         "p50_latency_ms": 0.69,
         "p95_latency_ms": 1.86,
         "est_usd": 1.0206,
         "utility_delta_vs_none": null,
-        "asr_drop_vs_none": 13.5,
+        "asr_drop_vs_none": 13.4,
         "utility_gain_vs_rules": null,
+        "ua_gain_vs_static": null,
         "utility_retention": null
       }
     }

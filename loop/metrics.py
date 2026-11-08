@@ -169,6 +169,7 @@ def cell(model_dir: Path) -> dict:
         "invalid_logs": invalid,
         "suites": sorted({r.suite_name for r in runs}),
         "benign_suites": sorted({r.suite_name for r in benign}),  # utility comparisons gate on this (benign only)
+        "attack_suites": sorted({r.suite_name for r in attacked}),  # ua_gain_vs_static gates on this (C24)
         "n_events": len(evs),
         "denied_calls_benign_rate": pct(b_deny, b_calls),
         # ponytail: fork-log denials only; a killed sub-agent's history (and its earlier denials) is discarded
@@ -187,6 +188,7 @@ def cell(model_dir: Path) -> dict:
         "utility_delta_vs_none": None,  # filled in compute()
         "asr_drop_vs_none": None,
         "utility_gain_vs_rules": None,
+        "ua_gain_vs_static": None,  # utility under attack, ADAPTIVE - STATIC (PLAN §6 row added 08:20; loop sync C24)
         "utility_retention": None,  # % of own NONE utility (PLAN §6 H1, C13)
     }
 
@@ -269,6 +271,10 @@ def compute(runs_root: Path, bench: str = "mad", out: Path = Path("results")) ->
                                       if same_b and c["utility_no_attack"] is not None and bu else None)
             c["utility_gain_vs_rules"] = (sub(c["utility_no_attack"], rules.get("utility_no_attack"))
                                           if same_r and ci_overlap(c["asr_ci"], rules.get("asr_ci")) else None)
+            static = cells.get("STATIC", {}).get(m, {})
+            same_a = c.get("attack_suites") == static.get("attack_suites")  # None == None when the key is absent
+            c["ua_gain_vs_static"] = (sub(c["utility_under_attack"], static.get("utility_under_attack"))
+                                      if same_a and cfg == "ADAPTIVE" else None)
     dec_f = out / "decider_eval.json"
     return {
         "generated": time.strftime("%Y-%m-%d %H:%M:%S %Z"),
