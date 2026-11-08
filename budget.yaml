@@ -13,7 +13,7 @@ providers:
     key_env: COMMAND_CODE_API  # value in ~/.zshrc; session env may be stale -> re-read from rc
     window_5h_usd: 20
     window_7d_usd: 50
-    month_usd: 100
+    month_usd: 100             # the gate uses month_usd as the total cap for commandcode (no separate cap key)
     reserve_usd: 5
     max_concurrent: 3          # assumed ("Standard" rate limits); back off on 429
     not_in_plan: [gpt-5.5, claude-fable-5, claude-opus-*]
@@ -37,7 +37,7 @@ prices:
   kimi-k3.1-pro:    {input: 3.00, output_est: 12.0, note: not used}
   # Command Code (commandcode.ai/docs/resources/pricing-limits, per 1M tokens)
   deepseek/deepseek-v4.1-flash: {input: 0.15, output: 0.60, provider: commandcode}
-  claude-haiku-5-5:             {input: 0.10, output: 0.50, provider: commandcode, endpoint: /messages, allowance_usd: 20, optional: true}
+  # claude-haiku-5-5 dropped at P1-end: needs Anthropic /messages client the fork lacks; run.py refuses it
   # OpenRouter
   openai/gpt-4.1:               {input: 2.00, output: 8.00, provider: openrouter, note: paper anchor}
 # measured 06:40 on gpt-oss:20b smoke + 120b run (≈7 s/episode): ~6-7k tokens per injected episode, ~6k per benign; projection uses 8k
