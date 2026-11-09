@@ -1,0 +1,83 @@
+# C36: Adaption Labs full lane, needs N keys (ADAPTION_API_KEY, _2.._N in ~/.zshrc; 20 req/min each). KEY '-' = not ollama.
+#   Launch: SG_KEY_SLOTS=$(uv run python -c 'from bench.providers import key_slots; print(key_slots("ADAPTION_API_KEY"))') \
+#     SG_DECIDER_HOST=http://192.168.0.146:11434/v1 SG_MONITOR_CFG=bench/configs/ADAPTIVE_v3b.yaml SG_DONE_DIR=runs/mad/.done_adaption \
+#     uv run python bench/supervise.py bench/cells_adaption_full.txt --max-live $((3*SLOTS))
+#   Order = priority; partial cells are labelled with n at render. 1) qwen3.5-397b full matrix 2) gemma-4-31b-it full 3) glm-5.2 NONE/ADAPTIVE 4) flash tiers banking+slack.
+NONE qwen3.5-397b banking none -
+NONE qwen3.5-397b slack none -
+NONE qwen3.5-397b travel none -
+NONE qwen3.5-397b workspace none -
+ADAPTIVE qwen3.5-397b banking none -
+ADAPTIVE qwen3.5-397b slack none -
+ADAPTIVE qwen3.5-397b travel none -
+ADAPTIVE qwen3.5-397b workspace none -
+NONE qwen3.5-397b banking important_instructions -
+NONE qwen3.5-397b slack important_instructions -
+NONE qwen3.5-397b travel important_instructions -
+ADAPTIVE qwen3.5-397b banking important_instructions -
+ADAPTIVE qwen3.5-397b slack important_instructions -
+ADAPTIVE qwen3.5-397b travel important_instructions -
+STATIC qwen3.5-397b banking none -
+STATIC qwen3.5-397b slack none -
+STATIC qwen3.5-397b travel none -
+STATIC qwen3.5-397b workspace none -
+STATIC qwen3.5-397b banking important_instructions -
+STATIC qwen3.5-397b slack important_instructions -
+STATIC qwen3.5-397b travel important_instructions -
+NONE qwen3.5-397b workspace important_instructions - --max-episodes 280
+ADAPTIVE qwen3.5-397b workspace important_instructions - --max-episodes 280
+STATIC qwen3.5-397b workspace important_instructions - --max-episodes 280
+NONE gemma-4-31b-it banking none -
+NONE gemma-4-31b-it slack none -
+NONE gemma-4-31b-it travel none -
+NONE gemma-4-31b-it workspace none -
+ADAPTIVE gemma-4-31b-it banking none -
+ADAPTIVE gemma-4-31b-it slack none -
+ADAPTIVE gemma-4-31b-it travel none -
+ADAPTIVE gemma-4-31b-it workspace none -
+NONE gemma-4-31b-it banking important_instructions -
+NONE gemma-4-31b-it slack important_instructions -
+NONE gemma-4-31b-it travel important_instructions -
+ADAPTIVE gemma-4-31b-it banking important_instructions -
+ADAPTIVE gemma-4-31b-it slack important_instructions -
+ADAPTIVE gemma-4-31b-it travel important_instructions -
+STATIC gemma-4-31b-it banking none -
+STATIC gemma-4-31b-it slack none -
+STATIC gemma-4-31b-it travel none -
+STATIC gemma-4-31b-it workspace none -
+STATIC gemma-4-31b-it banking important_instructions -
+STATIC gemma-4-31b-it slack important_instructions -
+STATIC gemma-4-31b-it travel important_instructions -
+NONE gemma-4-31b-it workspace important_instructions - --max-episodes 280
+ADAPTIVE gemma-4-31b-it workspace important_instructions - --max-episodes 280
+STATIC gemma-4-31b-it workspace important_instructions - --max-episodes 280
+NONE glm-5.2 banking none -
+NONE glm-5.2 slack none -
+NONE glm-5.2 travel none -
+NONE glm-5.2 workspace none -
+ADAPTIVE glm-5.2 banking none -
+ADAPTIVE glm-5.2 slack none -
+ADAPTIVE glm-5.2 travel none -
+ADAPTIVE glm-5.2 workspace none -
+NONE glm-5.2 banking important_instructions -
+NONE glm-5.2 slack important_instructions -
+ADAPTIVE glm-5.2 banking important_instructions -
+ADAPTIVE glm-5.2 slack important_instructions -
+NONE glm-5.2 travel important_instructions -
+ADAPTIVE glm-5.2 travel important_instructions -
+NONE deepseek-v4-flash banking none -
+NONE deepseek-v4-flash slack none -
+ADAPTIVE deepseek-v4-flash banking none -
+ADAPTIVE deepseek-v4-flash slack none -
+NONE deepseek-v4-flash banking important_instructions -
+NONE deepseek-v4-flash slack important_instructions -
+ADAPTIVE deepseek-v4-flash banking important_instructions -
+ADAPTIVE deepseek-v4-flash slack important_instructions -
+NONE glm-53-flash banking none -
+NONE glm-53-flash slack none -
+ADAPTIVE glm-53-flash banking none -
+ADAPTIVE glm-53-flash slack none -
+NONE glm-53-flash banking important_instructions -
+NONE glm-53-flash slack important_instructions -
+ADAPTIVE glm-53-flash banking important_instructions -
+ADAPTIVE glm-53-flash slack important_instructions -

@@ -18,8 +18,14 @@ def run_args(c) -> list[str]:
     return (["--bench", "mad", "--config", c[0], "--model", c[1], "--suite", c[2], "--attack", c[3]]
             + (["--key", c[4]] if c[4] != "-" else []) + c[5:])
 
+SLOTS = int(os.environ.get("SG_KEY_SLOTS", "1"))  # C36: rotate SG_KEY_SLOT 1..N per launched cell (Adaption: 20 req/min per key)
+_slot = [0]
+
 def key_env() -> dict:
     env = dict(os.environ)
+    if SLOTS > 1:
+        _slot[0] = _slot[0] % SLOTS + 1
+        env["SG_KEY_SLOT"] = str(_slot[0])
     if not env.get("OLLAMA_API_KEY1"):
         m = re.search(r'^export OLLAMA_API_KEY1="?([^"\n]+)"?', Path.home().joinpath(".zshrc").read_text(), re.M)
         if m: env["OLLAMA_API_KEY1"] = m.group(1)
@@ -36,7 +42,7 @@ def marker(c) -> Path:
 
 def gate_allows(c) -> bool:
     """Ask run.py --dry-run (no model calls). rc 0 = allow; rc 2 = budget/window refusal -> wait, do not count a try."""
-    r = subprocess.run(["uv", "run", "python", "bench/run.py", *run_args(c), "--dry-run"], capture_output=True, text=True, env=key_env())
+    r = subprocess.run(["uv", "run", "python", "bench/run.py", *run_args(c), "--dry-run"], capture_output=True, text=True, env={**key_env(), "SG_KEY_SLOT": "1"})
     if r.returncode == 2:
         print(time.strftime("%H:%M:%S"), "gate refused, waiting:", *c[:4], (r.stdout.strip().splitlines() or [""])[-1][:160], flush=True)
     return r.returncode == 0

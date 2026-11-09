@@ -42,11 +42,32 @@ def env_key(name: str, home: str | Path | None = None) -> str | None:
     """Last `export NAME=...` line in ~/.zshrc wins (the user edits keys there; session env copies go stale and
     caused 401s on Command Code); the env var is only the fallback when rc has no line."""
     rc = Path(home or os.path.expanduser("~")) / ".zshrc"
-    val = None
-    if rc.exists():
-        for m in re.finditer(rf'^\s*export\s+{re.escape(name)}=(.*)$', rc.read_text(), re.M):
+    text = rc.read_text() if rc.exists() else ""
+
+    def last(n):
+        val = None
+        for m in re.finditer(rf'^\s*export\s+{re.escape(n)}=(.*)$', text, re.M):
             val = m.group(1).strip().strip('"').strip("'")
-    return val or os.environ.get(name) or None
+        return val
+
+    # C36: SG_KEY_SLOT=n (set per cell by supervise.py) picks `NAME_n` when the rc has one (per-key rate limits:
+    # Adaption = 20 req/min per key); slot 1 or no such line -> the plain NAME.
+    slot = os.environ.get("SG_KEY_SLOT", "1")
+    val = last(f"{name}_{slot}") if slot != "1" else None
+    return val or last(name) or os.environ.get(name) or None
+
+
+def key_slots(name: str, home: str | Path | None = None) -> int:
+    """How many keys the rc holds for NAME: NAME plus NAME_2.. (contiguous)."""
+    n = 1 if env_key(name, home) else 0
+    while n and env_key(name, home) and _has(name, n + 1, home):
+        n += 1
+    return n
+
+
+def _has(name, slot, home):
+    rc = Path(home or os.path.expanduser("~")) / ".zshrc"
+    return rc.exists() and re.search(rf'^\s*export\s+{re.escape(name)}_{slot}=', rc.read_text(), re.M) is not None
 
 
 def resolve(model: str, key: str | None = "A", budget: dict | None = None) -> dict:
