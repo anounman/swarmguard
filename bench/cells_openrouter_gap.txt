@@ -1,0 +1,5 @@
+# C35: close the gpt-4.1 NONE denominator gap (56 -> 97 tasks): slack + travel benign only (user, 02:20 Nov 9).
+#   Launch: SG_DONE_DIR=runs/mad/.done_gap uv run python bench/supervise.py bench/cells_openrouter_gap.txt --max-live 1
+#   Travel waits on GATE REFUSE until OpenRouter is topped up (~$1-2).
+NONE openai/gpt-4.1 slack none -
+NONE openai/gpt-4.1 travel none -
