@@ -4,11 +4,12 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .env
-data/
+/data/
 runs/
 models/
 *.gguf
 .DS_Store
+*.pem
 loop/iter_*/
 bench/mad/runs/
 
