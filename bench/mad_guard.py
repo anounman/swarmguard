@@ -73,11 +73,18 @@ class UsageOpenAILLM(OpenAILLM):
         super().__init__(*a, **kw)
         self.total = {"prompt_tokens": 0, "completion_tokens": 0, "estimated": False}
         self._lg, self.task = None, None
+        # C34: Adaption Labs' vLLM gateway rejects the (non-spec) `name` field on tool messages (400 "messages.N.name")
+        self.strip_tool_name = "adaptionlabs" in str(getattr(self.client, "base_url", ""))
 
     def query(self, query, runtime, env=EmptyEnv(), messages=(), extra_args={}):
         # copy of OpenAILLM.query (8 lines) that keeps completion.usage
+        msgs = [_message_to_openai(x, self.model) for x in messages]
+        if self.strip_tool_name:
+            for m in msgs:
+                if m["role"] == "tool":
+                    m.pop("name", None)
         completion = chat_completion_request(
-            self.client, self.model, [_message_to_openai(x, self.model) for x in messages],
+            self.client, self.model, msgs,
             [_function_to_openai(t) for t in runtime.functions.values()], self.reasoning_effort, self.temperature,
         )
         out = (query, runtime, env, [*messages, _openai_to_assistant_message(completion.choices[0].message)], extra_args)
@@ -157,9 +164,10 @@ def make_pipeline(config, model_id: str, provider_env: dict, monitor_cfg: dict |
     """provider_env: {'OPENAI_COMPATIBLE_BASE_URL', 'OPENAI_COMPATIBLE_API_KEY'}."""
     config = GuardConfig(config)
     if llm is None:
-        client = client or openai.OpenAI(
-            base_url=provider_env["OPENAI_COMPATIBLE_BASE_URL"], api_key=provider_env["OPENAI_COMPATIBLE_API_KEY"]
-        )
+        base = provider_env["OPENAI_COMPATIBLE_BASE_URL"]
+        # C34: Adaption = 20 req/min per key -> let the openai client honour Retry-After (default max_retries=2 gives up)
+        client = client or openai.OpenAI(base_url=base, api_key=provider_env["OPENAI_COMPATIBLE_API_KEY"],
+                                         max_retries=12 if "adaptionlabs" in base else 2)
         # ponytail: provider quirks on the temperature knob (C28). Kimi K3.1 Pro (Command Code) rejects temperature != 1;
         # Claude 5.5 via Anthropic's OpenAI-compat endpoint rejects the parameter outright ("deprecated for this model")
         # -> None = omit it; everything else keeps the fork's 0.0.

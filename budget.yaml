@@ -38,7 +38,7 @@ providers:
     cap_usd: 900
     reserve_usd: 50
     allowed_models: [qwen3.5-397b, glm-5.2, glm-53-flash, gemma-4-31b-it, gemma-4-26b-a4b-it, deepseek-v4-flash, qwen3.8-27b]
-    max_concurrent: 8          # assumed; back off on 429
+    max_concurrent: 3          # C34: gateway = 20 requests/min per key (x-ratelimit-limit); openai client max_retries=12 honours Retry-After
   groq:
     allowed: false             # C15: key capped at 8,000 tokens/min -> unusable
   openai:
