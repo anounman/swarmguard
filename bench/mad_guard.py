@@ -59,7 +59,7 @@ def build_monitor(config: GuardConfig, monitor_cfg: dict | None):
     if config == GuardConfig.ADAPTIVE_RULES:
         return RulesMonitor()
     if config == GuardConfig.ADAPTIVE:
-        return CascadeMonitor(RulesMonitor(), llm(cfg["monitor"]))
+        return CascadeMonitor(RulesMonitor(), llm(cfg["monitor"]), floor=bool(cfg.get("rules_floor", False)))  # C40
     if config == GuardConfig.ADAPTIVE_AUDIT:
         return CascadeMonitor(CascadeMonitor(RulesMonitor(), llm(cfg["monitor"])), llm(cfg["auditor"]))
     return None
