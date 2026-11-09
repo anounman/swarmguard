@@ -14,7 +14,8 @@ BUDGET = ROOT / "budget.yaml"
 ALIASES = {"gpt-4.1": "openai/gpt-4.1",
            "kimi-k3.1-pro": "moonshotai/Kimi-K3.1-Pro"}
 OLLAMA_KEYS = {"A": "OLLAMA_API_KEY", "B": "OLLAMA_API_KEY1"}
-MODELS = ["deepseek-v4.1-flash",  # C29: bare id = Ollama Cloud (vendor-prefixed deepseek/... = Command Code)
+MODELS = ["qwen3.5-397b", "glm-5.2", "glm-53-flash", "gemma-4-31b-it", "gemma-4-26b-a4b-it", "deepseek-v4-flash", "qwen3.8-27b",  # C33 Adaption Labs
+          "deepseek-v4.1-flash",  # C29: bare id = Ollama Cloud (vendor-prefixed deepseek/... = Command Code)
           "gpt-oss:120b", "gpt-oss:20b", "deepseek/deepseek-v4.1-flash", "openai/gpt-4.1", "claude-haiku-5-5",
           "claude-sonnet-5-5", "claude-opus-5-5", "moonshotai/Kimi-K3.1-Pro", *ALIASES]
 

@@ -32,6 +32,13 @@ providers:
     reserve_usd: 5
     allowed_models: [claude-sonnet-5-5, claude-opus-5-5, claude-haiku-5-5]   # NOT fable
     max_concurrent: 4
+  adaption:                    # C33 (02:20 CET Nov 9): hackathon credit ~$1,000 (user); OpenAI-compatible chat/completions
+    base_url: https://api.prod.adaptionlabs.ai/api/v1
+    key_env: ADAPTION_API_KEY   # ~/.zshrc
+    cap_usd: 900
+    reserve_usd: 50
+    allowed_models: [qwen3.5-397b, glm-5.2, glm-53-flash, gemma-4-31b-it, gemma-4-26b-a4b-it, deepseek-v4-flash, qwen3.8-27b]
+    max_concurrent: 8          # assumed; back off on 429
   groq:
     allowed: false             # C15: key capped at 8,000 tokens/min -> unusable
   openai:
@@ -54,6 +61,14 @@ prices:
   claude-opus-5-5:              {input: 15.00, output: 75.00, provider: anthropic, note: only if >= $40 left after Sonnet}
   # Command Code strong open model (C18)
   moonshotai/Kimi-K3.1-Pro:     {input: 2.00, output: 10.00, provider: commandcode}
+  # Adaption Labs (C33) — list prices not published on the docs page we could read; prices from docs.adaptionlabs.ai/inference-stacks/models (credits per 1M tokens)
+  qwen3.5-397b:               {input: 0.55, output: 3.5, provider: adaption, note: docs.adaptionlabs.ai/inference-stacks/models (credits per 1M tokens, 2026-11-09)}
+  glm-5.2:                    {input: 1.4, output: 4.4, provider: adaption, note: docs.adaptionlabs.ai/inference-stacks/models (credits per 1M tokens, 2026-11-09)}
+  glm-53-flash:               {input: 0.15, output: 0.5, provider: adaption, note: docs.adaptionlabs.ai/inference-stacks/models (credits per 1M tokens, 2026-11-09)}
+  gemma-4-31b-it:             {input: 0.09, output: 0.34, provider: adaption, note: docs.adaptionlabs.ai/inference-stacks/models (credits per 1M tokens, 2026-11-09)}
+  gemma-4-26b-a4b-it:         {input: 0.0765, output: 0.255, provider: adaption, note: docs.adaptionlabs.ai/inference-stacks/models (credits per 1M tokens, 2026-11-09)}
+  deepseek-v4-flash:          {input: 0.04444, output: 0.13332, provider: adaption, note: docs.adaptionlabs.ai/inference-stacks/models (credits per 1M tokens, 2026-11-09)}
+  qwen3.8-27b:                {input: 0.039, output: 1.25, provider: adaption, note: docs.adaptionlabs.ai/inference-stacks/models (credits per 1M tokens, 2026-11-09)}
   # OpenRouter
   openai/gpt-4.1:               {input: 2.00, output: 8.00, provider: openrouter, note: paper anchor}
 # measured 06:40 on gpt-oss:20b smoke + 120b run (≈7 s/episode): ~6-7k tokens per injected episode, ~6k per benign; projection uses 8k
