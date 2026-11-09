@@ -53,7 +53,7 @@ def env_key(name: str, home: str | Path | None = None) -> str | None:
     # C36: SG_KEY_SLOT=n (set per cell by supervise.py) picks `NAME_n` when the rc has one (per-key rate limits:
     # Adaption = 20 req/min per key); slot 1 or no such line -> the plain NAME.
     slot = os.environ.get("SG_KEY_SLOT", "1")
-    val = last(f"{name}_{slot}") if slot != "1" else None
+    val = (last(f"{name}_{slot}") or last(f"{name}{slot}")) if slot != "1" else None  # NAME_2 or NAME2
     return val or last(name) or os.environ.get(name) or None
 
 
@@ -67,7 +67,7 @@ def key_slots(name: str, home: str | Path | None = None) -> int:
 
 def _has(name, slot, home):
     rc = Path(home or os.path.expanduser("~")) / ".zshrc"
-    return rc.exists() and re.search(rf'^\s*export\s+{re.escape(name)}_{slot}=', rc.read_text(), re.M) is not None
+    return rc.exists() and re.search(rf'^\s*export\s+{re.escape(name)}_?{slot}=', rc.read_text(), re.M) is not None
 
 
 def resolve(model: str, key: str | None = "A", budget: dict | None = None) -> dict:

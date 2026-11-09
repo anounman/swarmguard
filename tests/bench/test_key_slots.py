@@ -12,3 +12,10 @@ def test_key_slot_picks_suffixed_key(tmp_path, monkeypatch):
     assert env_key("FOO_KEY", tmp_path) == "k1"
     assert key_slots("FOO_KEY", tmp_path) == 3
     assert key_slots("NOPE", tmp_path) == 0
+
+
+def test_key_slot_no_underscore_spelling(tmp_path, monkeypatch):
+    (tmp_path / ".zshrc").write_text('export BAR="b"\nexport BAR1="b1"\nexport BAR2="b2"\n')
+    monkeypatch.setenv("SG_KEY_SLOT", "2")
+    assert env_key("BAR", tmp_path) == "b2"
+    assert key_slots("BAR", tmp_path) == 2
