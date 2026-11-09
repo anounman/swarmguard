@@ -10,3 +10,6 @@ STATIC openai/gpt-4.1 banking none -
 ADAPTIVE openai/gpt-4.1 slack none -
 ADAPTIVE openai/gpt-4.1 travel none -
 ADAPTIVE openai/gpt-4.1 banking important_instructions - --max-episodes 60
+
+# C39 (03:50 Nov 9): widen the anchor attack sample to the full banking suite so ADAPTIVE and NONE share all 144 episodes (user: "use all the $5")
+ADAPTIVE openai/gpt-4.1 banking important_instructions -
