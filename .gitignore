@@ -18,3 +18,11 @@ train/data/
 train/data_v3/*.jsonl
 train/data_v3/*_spend.json
 docs/build/
+
+# Not published: planning notes, report drafts/templates, presentation material, spend data (code + evaluation results only)
+/PLAN.md
+/PROGRESS.md
+/HANDOFF.md
+/ARCHITECTURE.md
+/docs/
+/results/spend.json

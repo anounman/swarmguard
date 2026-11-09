@@ -103,6 +103,8 @@ def test_metrics_compare_harvest_render(tmp_path):
     assert sum(r.output.risk < 8 for r in rows) == 1   # FP from the benign DENY
     assert all(1 <= len(r.window) <= 8 for r in rows)
 
+    if not (ROOT / "docs" / "REPORT.md").exists():  # report drafts are not published in the public repo
+        return
     out = tmp_path / "REPORT.filled.md"
     run("docs/render.py", "--metrics", str(res / "metrics.json"), "--out", str(out))
     txt = out.read_text()
@@ -111,6 +113,7 @@ def test_metrics_compare_harvest_render(tmp_path):
     assert "{{" not in txt and "24.7†" in txt
 
 
+@pytest.mark.skipif(not (ROOT / "docs" / "render.py").exists(), reason="report renderer not published in the public repo")
 def test_render_rejects_typo():
     sys.path.insert(0, str(ROOT / "docs"))
     import pytest

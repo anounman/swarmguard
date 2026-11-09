@@ -2,7 +2,7 @@
 
 Per-task roles, one gateway for every tool call, and a small trained decider for multi-agent LLM systems.
 
-Ankush (GitHub: anounman), Universität des Saarlandes. Built in one weekend for the Apart Research Swarm Alignment Hackathon (November 6 to 8, 2026), Track 4 (Multi-Agent Oversight and Control), with limited time and budget. The long report is `docs/REPORT.md`.
+Ankush (GitHub: anounman), Universität des Saarlandes. Built in one weekend for the Apart Research Swarm Alignment Hackathon (November 6 to 8, 2026), Track 4 (Multi-Agent Oversight and Control), with limited time and budget.
 
 ## Problem
 
@@ -72,7 +72,6 @@ uv run pytest -q              # no network
 make dry-run                  # plan + budget-gate decision per cell, launches nothing
 uv run python bench/run.py --bench mad --config STATIC --model gpt-oss:120b --suite workspace --attack important_instructions --key A
 make metrics                  # runs/ -> loop/metrics.py -> results/metrics.json, results/results.md
-make report                   # fills docs/REPORT.md placeholders -> docs/REPORT.filled.md
 ```
 
 Raw run logs (`runs/`) are not committed. Configs are in `bench/configs/`.
@@ -86,9 +85,7 @@ Raw run logs (`runs/`) are not committed. Configs are in `bench/configs/`.
 | `train/` | Decider data converters, splits, QLoRA training, evaluation, GGUF export and Ollama `Modelfile`. |
 | `loop/` | `metrics.py`, `paired.py` (McNemar tests), `compare.py`, `harvest.py`, `replay_strict.py`, and the loop driver. |
 | `docker/` | Sandbox demo with `sg` as the only tool door. |
-| `docs/` | `REPORT.md` (long report), `render.py`, figures, `REVIEW_2026-11-09.md` (independent review). |
 | `results/` | `metrics.json`, `results.md`, decider evaluations, spend. |
-| `PLAN.md`, `PROGRESS.md`, `HANDOFF.md`, `ARCHITECTURE.md` | Plan, decision log and progress notes. |
 
 ## Limitations
 
@@ -100,7 +97,7 @@ Raw run logs (`runs/`) are not committed. Configs are in `bench/configs/`.
 
 ## Prior and third-party work
 
-- Only planning notes (`PLAN.md` v1 to v3, `ARCHITECTURE.md`, `HANDOFF.md`) existed before the sprint. All code, data pipelines, results and the report were written during it.
+- Only planning notes (not published here) existed before the sprint. All code, data pipelines and results were written during it.
 - `bench/mad/` is the MultiAgentDojo fork of AgentDojo (MIT), vendored with one in-sprint line change: `openai_llm.py` parses a tool call with null arguments as `{}` instead of crashing.
 - Decider training data: AgentDojo run logs (MIT), AgentDrift (CC BY 4.0), StepGuard data (Apache-2.0), NVIDIA Nemotron-RL-Agentic-Indirect-Prompt-Injection-v1 (CC BY 4.0).
 - We build on and cite CaMeL, multi-CaMeL, Progent, AgentCap, trust-gated delegation and async control monitors.
