@@ -19,8 +19,8 @@ class Gateway:
         self.config = GuardConfig(config)
         self.run_id = run_id
         self.monitor = monitor
-        self.log = EventLog(log_path)
         self.id = Identity()
+        self.log = EventLog(log_path, key=self.id._sk)  # each write also signs the run's chain head
         self.taint = TaintTracker()  # run-wide: catches values laundered across agents
         self.tokens: dict[str, str] = {}  # agent_id -> current token
         self.killed: set[str] = set()

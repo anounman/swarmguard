@@ -1,4 +1,4 @@
-| config | suite | inj | onset | relay % | exec. spread % | mean agents | contained % | ASR % | top relay pairs |
+| config | suite | inj | onset | relay % | exec. spread % | mean agents | contained % | ASR among onset episodes | top relay pairs |
 |---|---|---|---|---|---|---|---|---|---|
 | NONE | all | 949 | 677 | 6.1 | 6.1 | 0.17 | 81.7 | 15.4 | filesystem_agent->transactions_agent (22), web_agent->slack_agent (13), filesystem_agent->account_agent (3) |
 | NONE | banking | 144 | 120 | 18.3 | 18.3 | 0.56 | 44.2 | 54.2 | filesystem_agent->transactions_agent (22), filesystem_agent->account_agent (3) |
@@ -30,3 +30,9 @@
 | ADAPTIVE_v3b | slack | 105 | 69 | 15.9 | 13.0 | 0.26 | 75.4 | 7.2 | web_agent->slack_agent (23), slack_agent->web_agent (1) |
 | ADAPTIVE_v3b | travel | 140 | 20 | 5.0 | 5.0 | 0.05 | 95.0 | 0.0 | hotels_agent->personal_assistant_agent (1) |
 | ADAPTIVE_v3b | workspace | 560 | 444 | 1.1 | 0.2 | 0.02 | 99.3 | 0.0 | cloud_drive_agent->email_agent (3), calendar_agent->email_agent (2), cloud_drive_agent->calendar_agent (1) |
+
+NONE: n_onset 677, no onset 272 (0 killed before delivery). STATIC: n_onset 669, no onset 280 (0 killed before delivery). ADAPTIVE_RULES: n_onset 595, no onset 354 (91 killed before delivery). ADAPTIVE: n_onset 605, no onset 344 (94 killed before delivery). ADAPTIVE_v3: n_onset 579, no onset 370 (119 killed before delivery). ADAPTIVE_v3b: n_onset 604, no onset 345 (104 killed before delivery).
+
+Note: Relay/spread/contained/ASR are over onset episodes only (injection text seen in a tool result); guarded configs lose onset episodes that SwarmGuard killed before the injected result was delivered (n_no_onset_killed), so configs are compared over different subsets and guarded contained % is understated.
+
+find_onset (training) on NONE: None for 1 of 109 successes, 135 of 949 injected episodes (rows dropped).

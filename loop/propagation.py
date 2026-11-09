@@ -18,12 +18,15 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from loop.metrics import DENIED_PREFIX, DENY_ERR, KILL_ERR, load_runs, model_dirname, pct, real_task
+from loop.metrics import DENIED_PREFIX, DENY_ERR, KILL_ERR, killed, load_runs, model_dirname, pct, real_task
 from sg.labels import norm
 from train.common import text
 from train.from_mad_runs import ground_truth, leaves
 
 ORCH = "orchestrator"
+NOTE = ("Relay/spread/contained/ASR are over onset episodes only (injection text seen in a tool result); guarded configs "
+        "lose onset episodes that SwarmGuard killed before the injected result was delivered (n_no_onset_killed), so "
+        "configs are compared over different subsets and guarded contained % is understated.")
 
 
 def _raw(tc) -> tuple[str, dict, str]:
@@ -116,8 +119,11 @@ def run(runs: Path, model: str, configs: list[str]) -> dict:
     for cfg in configs:
         rs, _ = load_runs(runs / cfg / model_dirname(model))
         inj = [r for r in rs if real_task(r.user_task_id) and r.injection_task_id and (r.attack_type or "none") != "none"]
-        eps = [e for e in map(episode, inj) if e]
-        out[cfg] = {"all": summarize(eps, len(inj)),
+        ep = [(r, episode(r)) for r in inj]
+        eps = [e for _, e in ep if e]
+        out[cfg] = {"n_onset": len(eps), "n_no_onset": len(inj) - len(eps),
+                    "n_no_onset_killed": sum(killed(r, cfg.startswith("ADAPTIVE")) for r, e in ep if e is None),
+                    "all": summarize(eps, len(inj)),
                     "by_suite": {s: summarize([e for e in eps if e["suite"] == s], sum(r.suite_name == s for r in inj))
                                  for s in sorted({r.suite_name for r in inj})},
                     "episodes": eps}
@@ -125,7 +131,7 @@ def run(runs: Path, model: str, configs: list[str]) -> dict:
 
 
 def table(res: dict) -> str:
-    h = ("| config | suite | inj | onset | relay % | exec. spread % | mean agents | contained % | ASR % | top relay pairs |\n"
+    h = ("| config | suite | inj | onset | relay % | exec. spread % | mean agents | contained % | ASR among onset episodes | top relay pairs |\n"
          "|---|---|---|---|---|---|---|---|---|---|")
     rows = []
     for cfg, v in res.items():
@@ -134,6 +140,32 @@ def table(res: dict) -> str:
             rows.append(f"| {cfg} | {suite} | {s['n_injected']} | {s['n_onset']} | {s['relay_pct']} | "
                         f"{s['executed_spread_pct']} | {s['mean_agents_reached']} | {s['contained_pct']} | {s['asr_pct']} | {pairs} |")
     return "\n".join([h, *rows])
+
+
+def find_onset_missed(model_dir: Path) -> dict:
+    """How many injected episodes (and successes) train.from_agentdojo_runs.find_onset returns None for, called as
+    train/from_mad_runs.rows_for_file calls it (those rows are dropped there, not mislabelled)."""
+    from train.from_agentdojo_runs import events_of, find_onset
+    n = s = miss = miss_s = 0
+    for f in sorted(model_dir.rglob("*.json")):
+        try:
+            d = json.loads(f.read_text())
+        except Exception:
+            continue
+        if ("security" not in d or not d.get("messages") or not real_task(d.get("user_task_id"))
+                or (d.get("attack_type") or "none") == "none" or not d.get("injections")):
+            continue
+        msgs = d["messages"]
+        users = [m for m in msgs if m.get("role") == "user"]
+        body = msgs[msgs.index(users[0]) + 1:] if users else msgs
+        events = events_of("x", body)
+        for e in events:
+            if e.tool and e.tool.startswith(DENIED_PREFIX):
+                e.tool = e.tool[len(DENIED_PREFIX):]
+        o = find_onset(events, body, d["injections"]) if events else None
+        n, s = n + 1, s + bool(d["security"])
+        miss, miss_s = miss + (o is None), miss_s + (o is None and bool(d["security"]))
+    return {"n_injected": n, "n_successes": s, "onset_none": miss, "onset_none_successes": miss_s}
 
 
 def main():
@@ -145,8 +177,13 @@ def main():
     a = ap.parse_args()
     res = run(Path(a.runs), a.model, a.configs)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(a.out).write_text(json.dumps(res, indent=1, default=str))
-    md = table(res)
+    extra = {"note": NOTE, "find_onset_unguarded": find_onset_missed(Path(a.runs) / "NONE" / model_dirname(a.model))}
+    Path(a.out).write_text(json.dumps({**extra, **res}, indent=1, default=str))
+    fo = extra["find_onset_unguarded"]
+    md = (table(res) + "\n\n" + " ".join(f"{c}: n_onset {v['n_onset']}, no onset {v['n_no_onset']} "
+                                          f"({v['n_no_onset_killed']} killed before delivery)." for c, v in res.items())
+          + f"\n\nNote: {NOTE}\n\nfind_onset (training) on NONE: None for {fo['onset_none_successes']} of "
+          f"{fo['n_successes']} successes, {fo['onset_none']} of {fo['n_injected']} injected episodes (rows dropped).")
     Path(a.out).with_suffix(".md").write_text(md + "\n")
     print(md)
 
