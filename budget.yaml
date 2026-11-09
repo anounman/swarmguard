@@ -22,7 +22,7 @@ providers:
   openrouter:                  # C16 (≈06:25 CET): user topped up $10
     base_url: https://openrouter.ai/api/v1
     key_env: OPENROUTER_API_KEY   # ~/.zshrc (session env stale)
-    cap_usd: 13.1              # C35 (02:20 Nov 9): live /credits = 40.00 - 38.70 used -> $1.30 left; ledger 11.88 -> cap 11.88 + 1.30 - 0.08. Travel benign waits for a top-up.
+    cap_usd: 18.2              # C35 (02:35 Nov 9): user topped up -> /credits 45.00 - 39.37 used = $5.63 left; ledger 12.68 -> cap 12.68 + 5.63 - 0.1
     allowed_models: [openai/gpt-4.1]
     purpose: paper anchor only
   anthropic:                   # C17: key arrives ≈13:00-14:00 CET; gate = key present AND allowed
