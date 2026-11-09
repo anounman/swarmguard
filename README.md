@@ -61,7 +61,7 @@ decision = gw.check(token, "send_email", {"recipients": ["bob@corp.com"]}, task_
 
 Replace your tool executor with `GuardedToolsExecutor(gw, token, task_text)` and every call passes through `check()`. The `sg` CLI (`python -m sg.cli`: `token mint|verify|revoke`, `check`, `run -- <cmd>`) wraps the same gateway for shell commands; `docker/demo.sh` shows it as the only way out of a sandbox (captured output in `docker/DEMO_OUTPUT.md`). Interface notes: `sg/README.md`.
 
-A possible use is coding harnesses such as Claude Code or Codex that spawn sub-agents and install tools: they could route tool calls through the gateway, and the decider (2.5 GB quantized) ran on one consumer GPU. This integration has **not** been built or tested.
+**Who it is for.** Systems built on models that do not resist injection on their own. In our runs Claude Sonnet 5.5 and Kimi K3.1 already had 0% attack success and only lost utility under the guard, while gpt-oss:120b (11.5%), gpt-oss:20b (9.8%), Gemma-4-31B (51.7%), Qwen3.5-397B (47.5%) and GPT-4.1 (31.7%) did not resist; the benefit tracks how easily a model is injected, not its size. Any architecture that spawns sub-agents (internal tools or chatbots with tool access built on open-weight models, or coding harnesses) could route its tool calls through the gateway, and the decider (2.5 GB quantized) ran on one consumer GPU. We have tested it only on MultiAgentDojo.
 
 ## Reproduce
 
