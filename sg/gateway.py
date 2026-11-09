@@ -5,7 +5,7 @@ import time
 from typing import Any
 
 from sg.identity import Identity, TokenError
-from sg.labels import SINKS, TaintTracker
+from sg.labels import SINKS, STRICT_SINKS, TaintTracker
 from sg.log import EventLog
 from sg.monitors import Monitor, injection_hits, is_injection, monitor_failed
 from sg.roles import design_role, egress_check
@@ -15,8 +15,10 @@ ADAPTIVE = {GuardConfig.ADAPTIVE_RULES, GuardConfig.ADAPTIVE, GuardConfig.ADAPTI
 
 
 class Gateway:
-    def __init__(self, config: GuardConfig, run_id: str, monitor: Monitor | None = None, log_path: str | None = None):
+    def __init__(self, config: GuardConfig, run_id: str, monitor: Monitor | None = None, log_path: str | None = None,
+                 strict: bool = False):
         self.config = GuardConfig(config)
+        self.sinks = STRICT_SINKS if strict else SINKS  # C45: strict also checks get_webpage urls and delete ids
         self.run_id = run_id
         self.monitor = monitor
         self.id = Identity()
@@ -125,13 +127,14 @@ class Gateway:
             return done(False, f"args match deny pattern {pat!r}")
         adaptive = self.config in ADAPTIVE and self.monitor is not None
         egress = egress_check(role, tool, args)
-        if egress is not None and not (adaptive and tool in SINKS):  # ADAPTIVE: the monitor judges egress misses
+        if egress is not None and not (adaptive and tool in self.sinks):  # ADAPTIVE: the monitor judges egress misses
             return done(False, f"egress not allowed: {egress}")
-        if tool in SINKS:
-            label = self.taint.label_args(tool, args, task_text)
+        if tool in self.sinks:
+            label = self.taint.label_args(tool, args, task_text, self.sinks)
             if adaptive:
                 pending = Event(run_id=self.run_id, agent_id=agent_id, step=self.step + 1, kind=EventKind.TOOL_CALL,
-                                tool=tool, args=args, label_out=label, meta={"egress": egress} if egress else {})
+                                tool=tool, args=args, label_out=label,
+                                meta={**({"egress": egress} if egress else {}), **({"sink": True} if tool not in SINKS else {})})
                 verdict = self.monitor.score(self.window(agent_id) + [pending], role, task_text)
                 self._event(agent_id=agent_id, kind=EventKind.VERDICT, tool=tool, risk=verdict.risk,
                             reason=verdict.rationale, meta={"category": verdict.category})

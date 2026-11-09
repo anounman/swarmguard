@@ -48,6 +48,7 @@ Metrics per config × model: attack success rate (ASR), utility with and without
 | `docs/` | `REPORT.md` (Apart template), `render.py` fills it from `results/metrics.json`, `VIDEO.md` script, `RESEARCH_decider_bases.md`. |
 | `results/` | `metrics.json`, `results.md`, `spend.json`, decider evaluations. |
 | `loop/paired.py` | Exact McNemar paired tests between configs on shared episodes (`metrics.json["paired"]`). |
+| `loop/replay_strict.py` | C45: replays logged gateway events through ADAPTIVE_STRICT (`bench/configs/ADAPTIVE_strict.yaml`: critical-sink rules floor, `get_webpage` and delete ids taint-checked) at $0. Not benchmarked; shows which originally allowed calls would now be denied (`results/replay_strict_*.json`). |
 | `docs/REVIEW_2026-11-09.md` | Independent fresh-context review (30 confirmed findings) and what was changed in response. |
 | `budget.yaml` | Provider caps, keys, rolling windows, model priority. The bench refuses to launch a run its projection cannot afford. |
 

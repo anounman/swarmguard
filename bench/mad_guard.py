@@ -59,7 +59,7 @@ def build_monitor(config: GuardConfig, monitor_cfg: dict | None):
     if config == GuardConfig.ADAPTIVE_RULES:
         return RulesMonitor()
     if config == GuardConfig.ADAPTIVE:
-        return CascadeMonitor(RulesMonitor(), llm(cfg["monitor"]), floor=bool(cfg.get("rules_floor", False)))  # C40
+        return CascadeMonitor(RulesMonitor(), llm(cfg["monitor"]), floor=cfg.get("rules_floor", False))  # C40/C45: bool or tool list
     if config == GuardConfig.ADAPTIVE_AUDIT:
         return CascadeMonitor(CascadeMonitor(RulesMonitor(), llm(cfg["monitor"])), llm(cfg["auditor"]))
     return None
@@ -188,7 +188,8 @@ def make_pipeline(config, model_id: str, provider_env: dict, monitor_cfg: dict |
             raise ValueError(f"{config.value} needs a monitor")
         n = itertools.count()
         mad = GuardedMultiAgentPipeline(
-            llm, sysmsg, lambda: Gateway(config, f"{run_id}-{next(n)}", monitor=monitor, log_path=log_path), Exec)
+            llm, sysmsg, lambda: Gateway(config, f"{run_id}-{next(n)}", monitor=monitor, log_path=log_path,
+                                         strict=bool((monitor_cfg or {}).get("strict", False))), Exec)  # C45
     pipe = AgentPipeline([mad])
     pipe.name = pipeline_name(config, model_id)
     pipe.llm_counter = llm

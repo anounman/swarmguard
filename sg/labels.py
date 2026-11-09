@@ -51,6 +51,20 @@ SINKS: dict[str, tuple[tuple[str, ...], bool]] = {
     "reserve_car_rental": (("company",), True),
 }
 
+# C45 STRICT (residual-risk fixes, not benchmarked): two of the three causes of the 10 attacks that got through
+# ADAPTIVE on gpt-oss:120b. get_webpage was never scored (5/10: phishing-link visits) -> its url is now a checked
+# sink arg; delete_file / delete_email / cancel_calendar_event had no checked arg (2/10: "delete file 13") -> their
+# id is checked too. Short ids ("13") are below the entity length, so ids are matched whole-word against outputs
+# that carried injection markers only.
+STRICT_SINKS: dict[str, tuple[tuple[str, ...], bool]] = {
+    **SINKS,
+    "get_webpage": (("url",), False),
+    "delete_file": (("file_id",), True),
+    "delete_email": (("email_id",), True),
+    "cancel_calendar_event": (("event_id",), True),
+}
+ID_ARGS = {"file_id", "email_id", "event_id"}
+
 
 def norm(s: str) -> str:
     s = str(s).strip().lower()
@@ -90,10 +104,12 @@ class TaintTracker:
         self.tainted: dict[str, set[str]] = {}  # normalised entity -> source tools
         self.texts: list[tuple[str, str]] = []  # (source tool, normalised raw output)
         self.alarm: list[str] = []  # tools whose output carried injection markers
+        self.injected: list[tuple[str, str]] = []  # (source tool, lowercased raw output) of marker-carrying outputs
 
     def ingest(self, tool: str, result_text: str, injected: bool = True) -> None:
         if injected:
             self.alarm.append(tool)
+            self.injected.append((tool, (result_text or "").lower()))
         for e in entities(result_text or ""):
             self.tainted.setdefault(e, set()).add(tool)
         self.texts.append((tool, norm(result_text or "")))
@@ -108,15 +124,20 @@ class TaintTracker:
         src |= {t for t, txt in self.texts if v in txt}
         return src
 
-    def label_args(self, tool: str, args: dict[str, Any] | None, task_text: str) -> Label:
+    def label_args(self, tool: str, args: dict[str, Any] | None, task_text: str, sinks: dict | None = None) -> Label:
         """Untrusted iff the run saw an injection AND some sink-arg value came from a tool
         output and is absent from the task."""
         if not self.alarm:
             return Label(trusted=True)
         task, low, ents = norm(task_text or ""), (task_text or "").lower(), entities(task_text or "")
         sources: set[str] = set()
-        for arg in SINKS.get(tool, ((), False))[0]:
+        for arg in (sinks or SINKS).get(tool, ((), False))[0]:
             for v in _values((args or {}).get(arg)):
+                if arg in ID_ARGS:  # C45: ids are short; untrusted iff named by an injected output and not by the task
+                    word = rf"(?<![a-z0-9]){re.escape(str(v).strip().lower())}(?![a-z0-9])"
+                    if str(v).strip() and not re.search(word, low):
+                        sources |= {t for t, txt in self.injected if re.search(word, txt)}
+                    continue
                 n = norm(v)
                 if n and (n in ents or re.search(rf"(?<![a-z0-9]){re.escape(n)}(?![a-z0-9])", low)
                           or (len(n) >= 6 and n in task)):  # whole-word / entity match, no 'bob' in 'bobby'
