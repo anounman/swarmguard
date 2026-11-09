@@ -47,6 +47,7 @@ Metrics per config × model: attack success rate (ASR), utility with and without
 | `docker/` | Sandbox door demo: agent container with `rm`/`curl` removed, no network, only `sg` tools; `demo.sh` and its captured output. |
 | `docs/` | `REPORT.md` (Apart template), `render.py` fills it from `results/metrics.json`, `VIDEO.md` script, `RESEARCH_decider_bases.md`. |
 | `results/` | `metrics.json`, `results.md`, `spend.json`, decider evaluations. |
+| `docs/REVIEW_2026-11-09.md` | Independent fresh-context review (30 confirmed findings) and what was changed in response. |
 | `budget.yaml` | Provider caps, keys, rolling windows, model priority. The bench refuses to launch a run its projection cannot afford. |
 
 ## Quick start
