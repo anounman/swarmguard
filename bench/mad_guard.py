@@ -168,6 +168,11 @@ def make_pipeline(config, model_id: str, provider_env: dict, monitor_cfg: dict |
         # C34: Adaption = 20 req/min per key -> let the openai client honour Retry-After (default max_retries=2 gives up)
         client = client or openai.OpenAI(base_url=base, api_key=provider_env["OPENAI_COMPATIBLE_API_KEY"],
                                          max_retries=12 if "adaptionlabs" in base else 2)
+        if "openrouter" in base:
+            # C38: OpenRouter pre-authorises the model's full 65k max_tokens against the KEY's remaining limit and
+            # returns 402 when the key is nearly spent ("can only afford 31876"); cap the request instead.
+            import functools
+            client.chat.completions.create = functools.partial(client.chat.completions.create, max_tokens=8192)
         # ponytail: provider quirks on the temperature knob (C28). Kimi K3.1 Pro (Command Code) rejects temperature != 1;
         # Claude 5.5 via Anthropic's OpenAI-compat endpoint rejects the parameter outright ("deprecated for this model")
         # -> None = omit it; everything else keeps the fork's 0.0.
