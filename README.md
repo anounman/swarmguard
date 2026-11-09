@@ -30,14 +30,14 @@ Benchmark: [MultiAgentDojo](https://github.com/james-pete/multiagentdojo) (an or
 
 | Config | ASR [95% CI] | Benign utility | Utility under attack |
 |---|---|---|---|
-| NONE | 11.5% [9.6, 13.7] | 67.0% | 63.9% |
-| STATIC (roles + gateway) | 1.8% [1.1, 2.9] | 63.9% | 52.6% |
-| ADAPTIVE_RULES (+ rules monitor) | 0.6% [0.3, 1.4] | 63.9% | 50.8% |
-| ADAPTIVE (+ decider v2) | 1.1% [0.6, 1.9] | 64.9% | 58.6% |
+| No guard (`NONE`) | 11.5% [9.6, 13.7] | 67.0% | 63.9% |
+| Roles + gateway (`STATIC`) | 1.8% [1.1, 2.9] | 63.9% | 52.6% |
+| + rules monitor (`ADAPTIVE_RULES`) | 0.6% [0.3, 1.4] | 63.9% | 50.8% |
+| Full SwarmGuard, + decider (`ADAPTIVE`) | 1.1% [0.6, 1.9] | 64.9% | 58.6% |
 
 - Deterministic enforcement (STATIC) does most of the security work.
 - The decider raises utility under attack from 52.6% to 58.6% compared with STATIC (paired McNemar p = 0.0005) and keeps 96.9% of benign utility. Its ASR difference from STATIC is not significant (p = 0.14).
-- Secondary, partial: on GPT-4.1, benign utility goes from 81.4% to 79.4% (97 tasks) and ASR from 31.7% (249 episodes) to 1.6% (244 episodes). The attack episodes are two-suite samples, so this is not a head-to-head comparison with multi-CaMeL, and we do not claim to beat it.
+- Context against multi-CaMeL (GPT-4.1): our budget covered 249 of the 949 attack episodes (all 144 banking plus the first 105 workspace). The paper's unguarded numbers (78.4% utility, 36.1% ASR) fall inside our unguarded run's 95% intervals (81.4% [73.7, 89.2]; 31.7% [26.3, 37.7]), so the sample is consistent with their baseline. Multi-CaMeL reports 0.0% ASR at 24.7% benign utility; SwarmGuard keeps 79.4% at 1.6% ASR (244 episodes). Reported, not reproduced, and different samples: context, not a controlled comparison.
 
 All numbers come from `results/metrics.json`; the readable summary is `results/results.md`.
 
@@ -94,7 +94,7 @@ Raw run logs (`runs/`) are not committed. Configs are in `bench/configs/`.
 
 - One run per config. Some model cells are partial samples (for GPT-4.1, the attack episodes cover two suites).
 - The taint rule arms on injection markers in tool output, so attacks without such markers are not caught by it.
-- Decider v2 shares the 97 user tasks with its training logs (public AgentDojo runs), though it saw no MultiAgentDojo trajectory.
+- The decider shares the 97 user tasks with its training logs (public AgentDojo runs), though it saw no MultiAgentDojo trajectory.
 - The adaptive red-team attacker we tried was weak (about 1% ASR even with no defence), so robustness to strong adaptive attacks is untested.
 - Decider weights are not released.
 
