@@ -2,7 +2,7 @@
 
 Per-task roles, one gateway for every tool call, and a small trained decider for multi-agent LLM systems.
 
-Ankush (GitHub: anounman), Universität des Saarlandes. Built in one weekend for the Apart Research Swarm Alignment Hackathon (Nov 7 to 9, 2026), Track 4 (Multi-Agent Oversight and Control), with limited time and budget. The long report is `docs/REPORT.md`.
+Ankush (GitHub: anounman), Universität des Saarlandes. Built in one weekend for the Apart Research Swarm Alignment Hackathon (November 6 to 8, 2026), Track 4 (Multi-Agent Oversight and Control), with limited time and budget. The long report is `docs/REPORT.md`.
 
 ## Problem
 
